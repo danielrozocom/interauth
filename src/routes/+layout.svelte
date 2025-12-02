@@ -11,8 +11,8 @@
   import type { LayoutData } from './$types';
   import '../app.css';
 
-  // Recibir datos del servidor
-  export let data: LayoutData;
+  // Recibir datos del servidor (modo runes): usar $props()
+  const { data } = $props<{ data: LayoutData }>();
 
   // Aplicar el color principal dinámicamente
   $effect(() => {
