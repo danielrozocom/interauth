@@ -1,0 +1,38 @@
+/**
+ * Estilos Globales
+ * 
+ * Importa Tailwind CSS y define estilos globales para la aplicación.
+ * La fuente Nunito se aplica globalmente desde aquí.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Variable CSS para el color principal - se setea dinámicamente */
+    --primary: #35528C;
+  }
+
+  body {
+    font-family: 'Nunito', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  /* Clase de utilidad para usar el color principal */
+  .text-primary {
+    color: var(--primary);
+  }
+  
+  .bg-primary {
+    background-color: var(--primary);
+  }
+  
+  .border-primary {
+    border-color: var(--primary);
+  }
+}
