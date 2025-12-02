@@ -2,7 +2,11 @@
   "name": "interauth",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "pnpm": ">=8 <9"
+  },
   "scripts": {
+    "reinstall:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/reinstall.ps1",
     "dev": "vite dev",
     "build": "vite build",
     "start": "node server.js",
