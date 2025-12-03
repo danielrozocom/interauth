@@ -20,6 +20,28 @@ if (missing.length) {
   process.exit(1);
 }
 
+// Safe startup logging: don't print secrets, only presence and masked values
+try {
+  const supabaseUrl = process.env.SUPABASE_URL || "";
+  const appName = process.env.APP_NAME || "";
+  const anon = process.env.SUPABASE_ANON_KEY || "";
+
+  const urlPreview = supabaseUrl
+    ? supabaseUrl.replace(/(^https?:\/\/)|(:.*$)/g, "")
+    : "";
+  const anonPreview = anon ? `${anon.slice(0, 4)}...${anon.slice(-4)}` : "";
+
+  console.info(
+    `Starting ${
+      appName || "app"
+    } — SUPABASE_URL present: ${!!supabaseUrl} (${urlPreview})`
+  );
+  if (anonPreview) console.info(`SUPABASE_ANON_KEY (masked): ${anonPreview}`);
+} catch (e) {
+  // never crash on logging
+  console.info("Startup logging error", e?.message || e);
+}
+
 const buildIndex = path.resolve(process.cwd(), "build", "index.js");
 if (!fs.existsSync(buildIndex)) {
   console.error("Cannot find build entry:", buildIndex);

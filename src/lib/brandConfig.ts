@@ -30,12 +30,7 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     primaryColor: "#35528C",
     redirectUrlAfterLogin: "https://pos.interfundeoms.edu.co/auth/callback",
   },
-  // Alias for legacy identifier `interpos` used in query params and docs
-  interpos: {
-    name: "InterPOS",
-    primaryColor: "#35528C",
-    redirectUrlAfterLogin: "https://pos.interfundeoms.edu.co/auth/callback",
-  },
+
   // InterAPP
   app: {
     name: "InterAPP",
