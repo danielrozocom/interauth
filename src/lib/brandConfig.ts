@@ -24,16 +24,22 @@ export interface BrandConfig {
  * Agrega nuevos sistemas aquí según sea necesario
  */
 const BRAND_CONFIG: Record<string, BrandConfig> = {
-  // POS principal
+  // InterPOS
   pos: {
-    name: "POS Interfunde OMS",
+    name: "InterPOS",
     primaryColor: "#35528C",
     redirectUrlAfterLogin: "https://pos.interfundeoms.edu.co/auth/callback",
   },
-  // Aplicación web POS alternativa
+  // Alias for legacy identifier `interpos` used in query params and docs
+  pos: {
+    name: "InterPOS",
+    primaryColor: "#35528C",
+    redirectUrlAfterLogin: "https://pos.interfundeoms.edu.co/auth/callback",
+  },
+  // InterAPP
   app: {
-    name: "App Interfunde OMS",
-    primaryColor: "#008080",
+    name: "InterAPP",
+    primaryColor: "#35528C",
     redirectUrlAfterLogin: "https://app.interfundeoms.edu.co/auth/callback",
   },
 };

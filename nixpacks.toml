@@ -1,0 +1,8 @@
+[env]
+NODE_VERSION = "18"
+
+[phases.setup]
+commands = [
+  "corepack enable",
+  "corepack prepare pnpm@8 --activate"
+]
