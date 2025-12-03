@@ -17,6 +17,10 @@ export interface BrandConfig {
   primaryColor: string;
   /** URL a donde redirigir después del login exitoso */
   redirectUrlAfterLogin: string;
+  /** URL opcional del logo (favicon/logo que se muestra en la tarjeta) */
+  logoUrl?: string;
+  /** Subtítulo opcional que aparece debajo del nombre en la pantalla de login */
+  subtitle?: string;
 }
 
 /**
@@ -29,6 +33,9 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     name: "InterPOS",
     primaryColor: "#35528C",
     redirectUrlAfterLogin: "https://pos.interfundeoms.edu.co/auth/callback",
+    // Puedes colocar aquí la ruta a un logo estático, por ejemplo '/static/logos/interpos.png'
+    // logoUrl: '/static/logos/interpos.png',
+    subtitle: "Login",
   },
 
   // InterAPP
@@ -36,6 +43,7 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     name: "InterAPP",
     primaryColor: "#35528C",
     redirectUrlAfterLogin: "https://app.interfundeoms.edu.co/auth/callback",
+    subtitle: "Login",
   },
 };
 

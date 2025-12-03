@@ -22,10 +22,8 @@ export const load: LayoutServerLoad = async ({ url }) => {
 
   // Validar que el parámetro exista
   if (!systemParam) {
-    throw error(400, {
-      message:
-        'Sistema no especificado. El parámetro "system" es requerido en la URL.',
-    });
+    // Si no se especifica 'system' redirigimos al dominio principal
+    throw redirect(307, "https://interfundeoms.edu.co");
   }
 
   // Resolver la configuración del brand
@@ -42,5 +40,8 @@ export const load: LayoutServerLoad = async ({ url }) => {
   return {
     system: systemParam,
     brandConfig: brandConfig as BrandConfig,
+    // Exponer la URL de Supabase al cliente para construir flujos de OAuth
+    supabaseUrl: process.env.SUPABASE_URL || null,
+    appName: process.env.APP_NAME || null,
   };
 };

@@ -3,6 +3,21 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 
+// Intentar cargar .env en tiempo de ejecución si las variables críticas faltan
+// Esto ayuda cuando el repositorio se despliega tal cual y no se configuran
+// las variables en el panel del proveedor. Solo cargamos si .env existe y
+// la variable SUPABASE_URL no está definida.
+try {
+  const envPath = path.resolve(process.cwd(), ".env");
+  if (!process.env.SUPABASE_URL && fs.existsSync(envPath)) {
+    // import() devuelve una promesa; usar top-level await es compatible en ESM
+    await import("dotenv").then((d) => d.config({ path: envPath }));
+    console.info("Loaded .env file into process.env");
+  }
+} catch (e) {
+  console.info("No .env loaded:", e?.message || e);
+}
+
 // Defaults for container environment
 if (!process.env.PORT) process.env.PORT = "3000";
 if (!process.env.HOST) process.env.HOST = "0.0.0.0";
