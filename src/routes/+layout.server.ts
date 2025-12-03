@@ -31,9 +31,8 @@ export const load: LayoutServerLoad = async ({ url }) => {
 
   // Si no existe la configuración, retornar error
   if (!brandConfig) {
-    throw error(404, {
-      message: `Sistema "${systemParam}" no encontrado o no configurado. Verifica el enlace con tu administrador.`,
-    });
+    // Si el 'system' no está configurado, redirigimos al dominio principal
+    throw redirect(307, "https://interfundeoms.edu.co");
   }
 
   // Retornar los datos al cliente
