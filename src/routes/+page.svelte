@@ -111,11 +111,20 @@
       console.error("Error iniciando sesión por correo:", err);
       // Mapear errores comunes a un mensaje más amigable
       const em = err || {};
-      const messageText =
+      let messageText: string;
+
+      // Verificar código de error específico
+      if (em?.code === "user_banned") {
+        messageText = "Usuario suspendido";
+      } else if (
         em?.status === 400 ||
         /invalid|incorrect|credentials|no user/i.test(em?.message || "")
-          ? "Credenciales inválidas"
-          : em?.message || String(em);
+      ) {
+        messageText = "Credenciales inválidas";
+      } else {
+        messageText = em?.message || String(em);
+      }
+
       infoMessage = messageText;
       loadingEmail = false;
     }
@@ -669,6 +678,7 @@
     padding: 0.6rem 0.8rem;
     border-radius: 8px;
     font-weight: 600;
+    text-align: center;
   }
   .error-message {
     margin-top: 0.5rem;
@@ -678,5 +688,6 @@
     padding: 0.5rem 0.75rem;
     border-radius: 8px;
     font-weight: 700;
+    text-align: center;
   }
 </style>

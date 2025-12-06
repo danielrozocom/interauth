@@ -1,0 +1,76 @@
+version: '3.8'
+
+# ============================================================================
+# Production Docker Compose Configuration
+# ============================================================================
+# This file is for production deployments.
+# Use this ONLY in production environments.
+#
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up
+#
+# Expected behavior:
+#   - Container builds using Dockerfile (NOT Dockerfile.dev)
+#   - Executes 'pnpm start' (vite preview on port 3000)
+#   - NO vite dev server (port 5173)
+#   - NO hot reload or file watching
+#
+# ============================================================================
+
+services:
+  interauth:
+    # Use the production Dockerfile (multi-stage, optimized)
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Optional: Configure build args if needed
+      args:
+        NODE_ENV: production
+    
+    # Port mapping: container:host
+    ports:
+      - "3000:3000"
+    
+    # Environment variables for production
+    environment:
+      # CRITICAL: Ensure NODE_ENV is set to production
+      NODE_ENV: production
+      # These MUST be set by the deployment platform
+      # (Dokploy, Railway, Coolify, etc.)
+      # SUPABASE_URL: ${SUPABASE_URL}
+      # SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      # APP_NAME: ${APP_NAME}
+    
+    # Restart policy for production
+    restart: unless-stopped
+    
+    # Resource limits (optional, adjust based on your needs)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1'
+    #       memory: 512M
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 256M
+    
+    # Health check
+    healthcheck:
+      test: [ "CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    
+    # No volumes in production (immutable container)
+    # volumes: []
+    
+    # Logging configuration (optional)
+    # logging:
+    #   driver: "json-file"
+    #   options:
+    #     max-size: "10m"
+    #     max-file: "3"
+
+# Optional: If you have other services (e.g., Postgres, Redis)
+# they would be defined here as well
