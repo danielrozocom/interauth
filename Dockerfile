@@ -23,5 +23,6 @@ COPY --from=build /app ./
 # Expose the port that `vite preview` will use
 EXPOSE 3000
 
-# Use pnpm preview to serve the production build on 0.0.0.0:3000
-CMD ["pnpm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
+# Use npm start so builders (Dokploy/Nixpacks) and Docker default to `npm start`.
+# `npm start` is configured in package.json to run `vite preview --host 0.0.0.0 --port 3000`.
+CMD ["npm", "start"]
