@@ -622,6 +622,9 @@
     border: 1px solid #e5e7eb;
     font-size: 0.95rem;
   }
+  .input:focus {
+    border-color: var(--primary);
+  }
   .form-group {
     display: flex;
     flex-direction: column;
