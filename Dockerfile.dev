@@ -6,8 +6,8 @@ WORKDIR /app
 # Ensure NIXPACKS_PATH points to local bin directory so it's defined inside the image
 ENV NIXPACKS_PATH=/app/node_modules/.bin:$PATH
 
-# Install pnpm v8 globally
-RUN npm install -g pnpm@8
+# Enable corepack and prepare pnpm v8.15.9 (avoids using `npm install -g`)
+RUN corepack enable && corepack prepare pnpm@8.15.9 --activate
 
 # Copy only lockfiles first for better caching
 COPY package.json pnpm-lock.yaml ./
