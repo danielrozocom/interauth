@@ -2,6 +2,7 @@
   "name": "interauth",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@8.15.9",
   "engines": {
     "node": ">=18",
     "pnpm": ">=8"

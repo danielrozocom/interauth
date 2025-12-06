@@ -1,6 +1,6 @@
 [env]
 NODE_VERSION = "18"
-NIXPACKS_PATH = ""
+NIXPACKS_PATH = "/app/node_modules/.bin:$PATH"
 
 [phases.setup]
 commands = [

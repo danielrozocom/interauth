@@ -3,6 +3,9 @@ FROM node:18-bullseye
 # Use a non-root user if desired (optional)
 WORKDIR /app
 
+# Ensure NIXPACKS_PATH points to local bin directory so it's defined inside the image
+ENV NIXPACKS_PATH=/app/node_modules/.bin:$PATH
+
 # Install pnpm v8 globally
 RUN npm install -g pnpm@8
 
@@ -10,7 +13,9 @@ RUN npm install -g pnpm@8
 COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies (will be stored in image node_modules)
-RUN pnpm install --frozen-lockfile --prefer-offline || pnpm install
+# Use --no-frozen-lockfile so build won't fail when a lockfile is missing
+# pnpm will still use the lockfile if it exists.
+RUN pnpm install --no-frozen-lockfile
 
 EXPOSE 5173
 
