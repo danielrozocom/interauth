@@ -7,3 +7,21 @@ commands = [
   "corepack enable",
   "corepack prepare pnpm@8 --activate"
 ]
+
+[phases.install]
+cmds = [
+  # Use pnpm for installs because this repo includes a pnpm lockfile and prefers pnpm.
+  "pnpm install --no-frozen-lockfile"
+]
+
+[phases.build]
+cmds = [
+  # Build the production assets
+  "pnpm run build"
+]
+
+[start]
+cmd = "npm start"
+
+[variables]
+PORT = "3000"
