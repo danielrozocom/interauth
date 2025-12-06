@@ -1,8 +1,9 @@
 [env]
 NODE_VERSION = "18"
+NIXPACKS_PATH = ""
 
 [phases.setup]
 commands = [
   "corepack enable",
-  "corepack prepare pnpm@8 --activate"
+  "corepack prepare pnpm@9 --activate"
 ]

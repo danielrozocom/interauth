@@ -573,6 +573,9 @@
     padding-top: 0.4rem;
     padding-bottom: 0.4rem;
   }
+  .password-input:focus {
+    border-color: var(--primary);
+  }
   .toggle-password {
     position: absolute;
     right: 10px;
