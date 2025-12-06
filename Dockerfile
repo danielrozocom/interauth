@@ -20,9 +20,11 @@ WORKDIR /app
 # Copy built app from build stage
 COPY --from=build /app ./
 
-# Expose the port that `vite preview` will use
+# Set the production port and expose it. This is the port the preview server will listen on.
+ENV PORT=3000
 EXPOSE 3000
 
-# Use npm start so builders (Dokploy/Nixpacks) and Docker default to `npm start`.
-# `npm start` is configured in package.json to run `vite preview --host 0.0.0.0 --port 3000`.
+# Production CMD: run the built app using the preview server on port 3000.
+# This CMD is intended for production images only — development uses `Dockerfile.dev` or `docker-compose.dev.yml`.
+# `npm start` runs the `preview` script from `package.json`, which runs `vite preview --host 0.0.0.0 --port 3000`.
 CMD ["npm", "start"]
