@@ -3,6 +3,11 @@ FROM node:18-bullseye
 # Use a non-root user if desired (optional)
 WORKDIR /app
 
+# NOTE: This Dockerfile is intended for local development only.
+# It runs the Vite dev server (`pnpm dev`) and should NOT be used
+# as the production image. Production builds should use the
+# top-level `Dockerfile` which runs the built app with `npm start`.
+
 # Ensure NIXPACKS_PATH points to local bin directory so it's defined inside the image
 ENV NIXPACKS_PATH=/app/node_modules/.bin:$PATH
 

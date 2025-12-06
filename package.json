@@ -9,10 +9,10 @@
   },
   "scripts": {
     "reinstall:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/reinstall.ps1",
-    "dev": "vite dev",
+    "dev": "vite dev --host 0.0.0.0 --port 5173",
     "build": "vite build",
-    "start": "npm run preview",
-    "preview": "vite preview --host 0.0.0.0 --port 3000",
+    "preview": "vite preview",
+    "start": "vite preview --host 0.0.0.0 --port 3000",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
   },
