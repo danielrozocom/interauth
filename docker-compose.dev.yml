@@ -1,0 +1,14 @@
+services:
+  interauth:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./:/app:cached
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      # Helpful for file watchers on some host OS
+      - CHOKIDAR_USEPOLLING=true
+    command: ["pnpm", "dev", "--", "--host", "0.0.0.0"]

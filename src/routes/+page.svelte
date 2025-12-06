@@ -3,39 +3,150 @@
 
   export let data: PageData;
 
-  let loading = false;
-  let nextTarget = "/home";
+  let loadingEmail = false;
+  let loadingOAuth = false;
+  let loadingReset = false;
 
-  $: (function () {
+  $: isLoading = loadingEmail || loadingOAuth || loadingReset;
+  let email = "";
+  let password = "";
+  let forgotMode = false;
+  let infoMessage: string | null = null;
+  let showPassword = false;
+
+  // Función para validar formato de email
+  function isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim());
+  }
+
+  // Determinar el sistema desde la URL (ej: ?system=pos)
+  $: systemParam = (() => {
     try {
-      const s = typeof window !== "undefined" ? window.location.search : "";
-      const n = new URLSearchParams(s).get("next");
-      nextTarget = n || "/home";
+      if (typeof window !== "undefined") {
+        return (
+          new URLSearchParams(window.location.search).get("system") || "pos"
+        );
+      }
+      return "pos";
     } catch {
-      nextTarget = "/home";
+      return "pos";
     }
   })();
 
+  // Construir la URL de callback según el sistema
+  $: callbackUrl = (() => {
+    const isDev = import.meta.env.DEV;
+    const system = systemParam.toLowerCase();
+
+    let url;
+    // Mapear sistema a variable de entorno
+    if (system === "pos" || system === "interpos") {
+      url = isDev
+        ? import.meta.env.VITE_POS_CALLBACK_URL_DEV ||
+          import.meta.env.VITE_POS_CALLBACK_URL
+        : import.meta.env.VITE_POS_CALLBACK_URL;
+    } else if (system === "app" || system === "interapp") {
+      url = isDev
+        ? import.meta.env.VITE_APP_CALLBACK_URL_DEV ||
+          import.meta.env.VITE_APP_CALLBACK_URL
+        : import.meta.env.VITE_APP_CALLBACK_URL;
+    } else {
+      // Fallback: usar la configuración del brandConfig si existe
+      url =
+        data?.brandConfig?.redirectUrlAfterLogin ||
+        import.meta.env.VITE_POS_CALLBACK_URL;
+    }
+
+    return url;
+  })();
+
   async function loginWithGoogle() {
-    loading = true;
+    loadingOAuth = true;
 
     try {
-      const redirectUrl =
-        data?.brandConfig?.redirectUrlAfterLogin ||
-        (typeof window !== "undefined" ? window.location.origin : "/");
-      const supabaseUrl =
-        data?.supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) throw new Error("Supabase URL no disponible");
+      const { data: res, error } = await data.supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: callbackUrl,
+        },
+      });
+      if (res && (res as any).url) {
+        window.location.href = (res as any).url;
+        return;
+      }
 
-      const authorizeUrl = `${supabaseUrl.replace(/\/$/, "")}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(
-        redirectUrl
-      )}`;
+      const target = data?.brandConfig?.redirectUrlAfterLogin || "/";
+      window.location.replace(target);
+    } catch (err: any) {
+      console.error("Error iniciando sesión con Google:", err);
+      infoMessage = err.message || String(err);
+      loadingOAuth = false;
+    }
+  }
 
-      window.location.href = authorizeUrl;
-    } catch (err) {
-      console.error("Error iniciando login con Supabase:", err);
-      alert("No se pudo iniciar el login.");
-      loading = false;
+  async function loginWithEmail() {
+    loadingEmail = true;
+    infoMessage = null;
+
+    // Validar formato de email
+    if (!isValidEmail(email)) {
+      infoMessage = "Ingresa un email válido";
+      loadingEmail = false;
+      return;
+    }
+
+    try {
+      const { data: res, error } = await data.supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) throw error;
+
+      // Si la sesión fue creada, redirigir al target configurado
+      const target = data?.brandConfig?.redirectUrlAfterLogin || "/";
+      window.location.replace(target);
+    } catch (err: any) {
+      console.error("Error iniciando sesión por correo:", err);
+      // Mapear errores comunes a un mensaje más amigable
+      const em = err || {};
+      const messageText =
+        em?.status === 400 ||
+        /invalid|incorrect|credentials|no user/i.test(em?.message || "")
+          ? "Credenciales inválidas"
+          : em?.message || String(em);
+      infoMessage = messageText;
+      loadingEmail = false;
+    }
+  }
+
+  async function sendPasswordReset() {
+    loadingReset = true;
+    infoMessage = null;
+
+    // Validar formato de email
+    if (!isValidEmail(email)) {
+      infoMessage = "Ingresa un email válido";
+      loadingReset = false;
+      return;
+    }
+
+    try {
+      const { data: res, error } =
+        await data.supabase.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: callbackUrl,
+        });
+
+      if (error) throw error;
+
+      infoMessage =
+        "Se ha enviado un correo con instrucciones. Revisa tu bandeja.";
+      loadingReset = false;
+    } catch (err: any) {
+      console.error("Error enviando correo de recuperación:", err);
+      infoMessage = err.message || String(err);
+      loadingReset = false;
     }
   }
 </script>
@@ -56,15 +167,174 @@
         alt="{data?.brandConfig?.name} logo"
         class="top-logo"
       />
+      {#if !forgotMode}
+        <div class="form-group">
+          <input
+            type="email"
+            placeholder="Correo electrónico"
+            bind:value={email}
+            class="input"
+            aria-label="Correo electrónico"
+          />
+
+          <div class="password-wrapper">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Contraseña"
+              bind:value={password}
+              class="input password-input"
+              aria-label="Contraseña"
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              aria-label={showPassword
+                ? "Ocultar contraseña"
+                : "Mostrar contraseña"}
+              on:click={() => (showPassword = !showPassword)}
+            >
+              {#if showPassword}
+                <!-- eye-off -->
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                  ><path
+                    d="M3 3l18 18"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  /><path
+                    d="M10.58 10.58a3 3 0 0 0 4.24 4.24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  /><path
+                    d="M9.53 5.09A10.94 10.94 0 0 1 12 4c5 0 9 3.5 10 8-0.57 2.08-1.63 3.86-3.07 5.29"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  /></svg
+                >
+              {:else}
+                <!-- eye -->
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden="true"
+                  ><path
+                    d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  /><circle
+                    cx="12"
+                    cy="12"
+                    r="3"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  /></svg
+                >
+              {/if}
+            </button>
+          </div>
+
+          <button
+            on:click={loginWithEmail}
+            class="login-btn mb-2"
+            disabled={isLoading || !email || !password || !isValidEmail(email)}
+            aria-busy={loadingEmail}
+          >
+            {#if loadingEmail}
+              <span class="spinner" aria-hidden="true"></span>
+              <span>Iniciando…</span>
+            {:else}
+              <span>Iniciar sesión con correo</span>
+            {/if}
+          </button>
+          {#if infoMessage}
+            <div class="error-message" role="alert" aria-live="assertive">
+              {infoMessage}
+            </div>
+          {/if}
+
+          <button
+            type="button"
+            class="link-btn"
+            on:click={() => {
+              forgotMode = true;
+              infoMessage = null;
+            }}
+          >
+            Olvidé mi contraseña
+          </button>
+        </div>
+      {:else}
+        <div class="form-group">
+          <p>
+            Introduce tu correo y te enviaremos un enlace para restablecer la
+            contraseña.
+          </p>
+          <input
+            type="email"
+            placeholder="Correo electrónico"
+            bind:value={email}
+            class="input"
+            aria-label="Correo electrónico"
+          />
+
+          <button
+            on:click={sendPasswordReset}
+            class="login-btn mb-2"
+            disabled={isLoading || !email || !isValidEmail(email)}
+            aria-busy={loadingReset}
+          >
+            {#if loadingReset}
+              <span class="spinner" aria-hidden="true"></span>
+              <span>Enviando…</span>
+            {:else}
+              <span>Enviar enlace de recuperación</span>
+            {/if}
+          </button>
+
+          <button
+            type="button"
+            class="link-btn"
+            on:click={() => {
+              forgotMode = false;
+              infoMessage = null;
+            }}
+          >
+            Volver al inicio de sesión
+          </button>
+        </div>
+      {/if}
+
+      {#if infoMessage && forgotMode}
+        <div class="info-message">{infoMessage}</div>
+      {/if}
+      <div class="separator-hr" aria-hidden="true"></div>
 
       <button
         on:click={loginWithGoogle}
         class="login-btn mb-3"
-        disabled={loading}
-        aria-busy={loading}
+        disabled={isLoading}
+        aria-busy={loadingOAuth}
         aria-label="Iniciar sesión con Google"
       >
-        {#if loading}
+        {#if loadingOAuth}
           <span class="spinner" aria-hidden="true"></span>
           <span>Redirigiendo…</span>
         {:else}
@@ -111,33 +381,51 @@
     min-height: calc(100vh - var(--topbar-h, 64px));
     align-items: center;
     justify-content: center;
-    overflow: auto;
-    padding: 1.5rem 0;
+    /* Let the browser handle scrolling to avoid nested scrollbars */
+    overflow: visible;
+    padding: 2rem 0;
   }
   .card {
     background: linear-gradient(180deg, #ffffff, #fbfdff);
     padding: 0;
-    border-radius: 14px;
-    border: 1px solid rgba(2, 6, 23, 0.03);
-    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.04);
+    border-radius: 16px;
+    border: 1px solid rgba(2, 6, 23, 0.06);
+    box-shadow: 0 12px 30px rgba(2, 6, 23, 0.06);
     /* Compact card for better desktop density */
     width: 360px;
     max-width: min(420px, 92%);
+    /* Keep rounded corners and avoid inner overflow (content may extend page) */
     overflow: hidden;
-    max-height: calc(100vh - var(--topbar-h, 64px) - 48px);
+    max-height: none;
     position: relative;
-    margin: 0 auto;
+    margin: 2rem auto;
+  }
+
+  /* When the card height exceeds the viewport, keep a comfortable top margin */
+  @media (max-height: 700px) {
+    .login-page {
+      align-items: flex-start;
+      padding-top: 2.5rem;
+      padding-bottom: 2.5rem;
+    }
+    .card {
+      margin-top: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
   }
   /* Desktop polish */
   @media (min-width: 1000px) {
     /* Slightly larger on wide screens but still compact */
     .card {
-      width: 420px;
+      width: 560px;
       border-radius: 16px;
       box-shadow: 0 14px 34px rgba(2, 6, 23, 0.05);
+      /* Allow enough height on desktop to avoid internal scroll */
+      max-height: none;
     }
     .card-body {
       padding: 1.25rem 1.5rem;
+      overflow: visible;
     }
     .top-logo {
       width: 110px;
@@ -148,6 +436,9 @@
     color: #fff;
     padding: 0.9rem 1rem;
     text-align: center;
+    /* Round only the top corners so background matches the parent card */
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
   }
   .brand h1 {
     font-size: 1.6rem;
@@ -157,8 +448,9 @@
   }
   .card-body {
     padding: 1rem 1.25rem;
-    overflow: auto;
-    max-height: calc(100vh - 160px);
+    /* Allow the page to scroll instead of the card */
+    overflow: visible;
+    max-height: none;
   }
   .card h2 {
     font-size: clamp(1.8rem, 3.5vw, 2.2rem);
@@ -177,14 +469,12 @@
     width: 96px;
     height: auto;
     max-height: 96px;
-    border-radius: 10px;
-    background: transparent;
-    padding: 0;
-    box-shadow: 0 6px 12px rgba(2, 6, 23, 0.04);
+    object-fit: contain;
   }
   @media (max-height: 700px), (max-width: 420px) {
     .card {
-      max-height: 92vh;
+      /* Allow the card to grow and let the page scroll instead of clipping */
+      overflow: visible;
       margin: 0 12px;
       width: calc(100% - 24px);
       border-radius: 12px;
@@ -263,5 +553,102 @@
   }
   .mt-4 {
     margin-top: 1rem;
+  }
+  .separator-hr {
+    width: 100%;
+    height: 1px;
+    background: #e5e7eb;
+    margin: 1rem 0;
+  }
+  .password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .password-input {
+    /* increase right padding to accommodate larger toggle button */
+    padding-right: 56px;
+    box-sizing: border-box;
+    height: 40px;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+  .toggle-password {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* match input height for perfect alignment */
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+    color: var(--primary);
+    border-radius: 8px;
+    box-shadow: none;
+    padding: 4px;
+    transition:
+      background 0.12s,
+      transform 0.08s,
+      box-shadow 0.12s;
+    z-index: 5;
+  }
+  .toggle-password:hover {
+    background: rgba(0, 0, 0, 0.04);
+    transform: translateY(-50%) scale(1.02);
+  }
+  .toggle-password svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+  }
+  .toggle-password:focus {
+    outline: 3px solid rgba(59, 130, 246, 0.18);
+    outline-offset: 2px;
+  }
+  .input {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.6rem;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    font-size: 0.95rem;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .link-btn {
+    background: transparent;
+    border: none;
+    color: #374151;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0.2rem 0;
+    font-weight: 700;
+  }
+  .info-message {
+    margin-top: 0.75rem;
+    color: #065f46;
+    background: #ecfdf5;
+    padding: 0.6rem 0.8rem;
+    border-radius: 8px;
+    font-weight: 600;
+  }
+  .error-message {
+    margin-top: 0.5rem;
+    color: #b91c1c;
+    background: #fee2e2;
+    border: 1px solid rgba(185, 28, 28, 0.12);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-weight: 700;
   }
 </style>

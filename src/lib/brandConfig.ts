@@ -33,8 +33,6 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     name: "InterPOS",
     primaryColor: "#35528C",
     redirectUrlAfterLogin: "https://pos.interfundeoms.edu.co/auth/callback",
-    // Puedes colocar aquí la ruta a un logo estático, por ejemplo '/static/logos/interpos.png'
-    // logoUrl: '/static/logos/interpos.png',
     subtitle: "Login",
   },
 
@@ -50,7 +48,39 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
 /**
  * Color por defecto si no se especifica uno
  */
-const DEFAULT_PRIMARY_COLOR = "#35528C";
+export const DEFAULT_PRIMARY_COLOR = "#35528C";
+
+/**
+ * Resumen mínimo de un sistema (para listados)
+ */
+export interface BrandSummary {
+  key: string;
+  name: string;
+  primaryColor: string;
+}
+
+/**
+ * Devuelve una lista de sistemas disponibles con su color primario
+ */
+export function getAvailableSystemsWithColors(): BrandSummary[] {
+  return Object.entries(BRAND_CONFIG).map(([key, cfg]) => ({
+    key,
+    name: cfg.name,
+    primaryColor: cfg.primaryColor || DEFAULT_PRIMARY_COLOR,
+  }));
+}
+
+/**
+ * Mapa de aliases para aceptar variantes en el parámetro `system`
+ * Permite que valores como `interpos` o `pos-prod` apunten a la misma configuración
+ */
+const BRAND_ALIASES: Record<string, string> = {
+  // comunes
+  interpos: "pos",
+  pos: "pos",
+  interapp: "app",
+  app: "app",
+};
 
 /**
  * Resuelve la configuración de un sistema
@@ -65,7 +95,18 @@ export function resolveBrand(
     return null;
   }
 
-  const config = BRAND_CONFIG[system.toLowerCase()];
+  const key = system.toLowerCase().trim();
+
+  // Intentar búsqueda directa
+  let config = BRAND_CONFIG[key];
+
+  // Si no existe, intentar resolver via alias
+  if (!config) {
+    const target = BRAND_ALIASES[key];
+    if (target) {
+      config = BRAND_CONFIG[target];
+    }
+  }
 
   if (!config) {
     return null;

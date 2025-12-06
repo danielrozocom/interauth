@@ -1,11 +1,22 @@
-/// <reference types="@sveltejs/kit" />
-/// <reference types="vite/client" />
+import { Session, SupabaseClient, User } from "@supabase/supabase-js";
 
-interface ImportMetaEnv {
-  readonly VITE_SUPABASE_URL: string;
-  readonly VITE_SUPABASE_ANON_KEY: string;
+declare global {
+  namespace App {
+    interface Locals {
+      supabase: SupabaseClient;
+      safeGetSession: () => Promise<{
+        session: Session | null;
+        user: User | null;
+      }>;
+      session: Session | null;
+      user: User | null;
+    }
+    interface PageData {
+      session: Session | null;
+    }
+    // interface Error {}
+    // interface Platform {}
+  }
 }
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
+export {};

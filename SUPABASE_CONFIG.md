@@ -9,7 +9,7 @@ Para que este intermediario funcione correctamente, debes configurar las siguien
 Esta variable debe contener todas las URLs de redirección permitidas, separadas por comas:
 
 ```env
-GOTRUE_URI_ALLOW_LIST=https://pos.interfundeoms.edu.co/auth/callback,https://app.interfundeoms.edu.co/auth/callback
+ADDITIONAL_REDIRECT_URLS=https://pos.interfundeoms.edu.co/*,https://app.interfundeoms.edu.co/*,http://localhost:5173/*
 ```
 
 ### GOTRUE_EXTERNAL_GOOGLE_ENABLED

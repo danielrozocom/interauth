@@ -41,6 +41,8 @@ export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
     // Configuración de persistencia de sesión
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    // We disable automatic URL fragment/session detection to let the
+    // dedicated `/auth/callback` page call `getSessionFromUrl` explicitly.
+    detectSessionInUrl: false,
   },
 });

@@ -1,0 +1,18 @@
+FROM node:18-bullseye
+
+# Use a non-root user if desired (optional)
+WORKDIR /app
+
+# Install pnpm v8 globally
+RUN npm install -g pnpm@8
+
+# Copy only lockfiles first for better caching
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies (will be stored in image node_modules)
+RUN pnpm install --frozen-lockfile --prefer-offline || pnpm install
+
+EXPOSE 5173
+
+# Default command runs vite in host mode so it's reachable from host
+CMD ["pnpm", "dev", "--", "--host", "0.0.0.0"]
