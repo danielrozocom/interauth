@@ -573,14 +573,21 @@
     padding-top: 0.4rem;
     padding-bottom: 0.4rem;
   }
+  .password-input,
+  .input {
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      background 150ms ease;
+  }
   .password-input:focus {
-    border-color: var(--primary);
+    border-color: #35528c;
   }
   .toggle-password {
     position: absolute;
     right: 10px;
     top: 50%;
-    transform: translateY(-50%);
+    transform: translateY(-70%);
     background: transparent;
     border: none;
     display: inline-flex;
@@ -590,19 +597,18 @@
     width: 40px;
     height: 40px;
     cursor: pointer;
-    color: var(--primary);
+    color: #6b7280;
     border-radius: 8px;
     box-shadow: none;
     padding: 4px;
     transition:
-      background 0.12s,
-      transform 0.08s,
-      box-shadow 0.12s;
+      background 150ms ease,
+      box-shadow 150ms ease,
+      color 150ms ease;
     z-index: 5;
   }
   .toggle-password:hover {
     background: rgba(0, 0, 0, 0.04);
-    transform: translateY(-50%) scale(1.02);
   }
   .toggle-password svg {
     display: block;
@@ -611,8 +617,9 @@
     pointer-events: none;
   }
   .toggle-password:focus {
-    outline: 3px solid rgba(59, 130, 246, 0.18);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(53, 82, 140, 0.06);
+    border-radius: 8px;
   }
   .input {
     width: 100%;
@@ -622,8 +629,23 @@
     border: 1px solid #e5e7eb;
     font-size: 0.95rem;
   }
-  .input:focus {
-    border-color: var(--primary);
+  /* Focus styles for inputs (including password) */
+  .input:focus,
+  .password-input:focus {
+    outline: none;
+    border-color: #35528c;
+    box-shadow: 0 6px 18px rgba(53, 82, 140, 0.06);
+  }
+
+  /* When the wrapper has focus within (input focused), style both input and toggle */
+  .password-wrapper:focus-within .password-input {
+    border-color: #35528c;
+    box-shadow: 0 6px 18px rgba(53, 82, 140, 0.06);
+  }
+  .password-wrapper:focus-within .toggle-password {
+    color: #35528c;
+    background: rgba(53, 82, 140, 0.03);
+    box-shadow: 0 4px 10px rgba(53, 82, 140, 0.04);
   }
   .form-group {
     display: flex;
