@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageData } from "./$types";
+  import PasswordInput from "$lib/components/PasswordInput.svelte";
 
   export let data: PageData;
 
@@ -12,7 +13,6 @@
   let password = "";
   let forgotMode = false;
   let infoMessage: string | null = null;
-  let showPassword = false;
 
   // Función para validar formato de email
   function isValidEmail(email: string): boolean {
@@ -154,7 +154,17 @@
       loadingReset = false;
     } catch (err: any) {
       console.error("Error enviando correo de recuperación:", err);
-      infoMessage = err.message || String(err);
+      if (
+        err.message &&
+        err.message.includes(
+          "For security purposes, you can only request this after 4 seconds."
+        )
+      ) {
+        infoMessage =
+          "Por motivos de seguridad, solo puedes solicitar esto después de 4 segundos.";
+      } else {
+        infoMessage = err.message || String(err);
+      }
       loadingReset = false;
     }
   }
@@ -186,79 +196,13 @@
             aria-label="Correo electrónico"
           />
 
-          <div class="password-wrapper">
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Contraseña"
-              bind:value={password}
-              class="input password-input"
-              aria-label="Contraseña"
-            />
-            <button
-              type="button"
-              class="toggle-password"
-              aria-label={showPassword
-                ? "Ocultar contraseña"
-                : "Mostrar contraseña"}
-              on:click={() => (showPassword = !showPassword)}
-            >
-              {#if showPassword}
-                <!-- eye-off -->
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                  ><path
-                    d="M3 3l18 18"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  /><path
-                    d="M10.58 10.58a3 3 0 0 0 4.24 4.24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  /><path
-                    d="M9.53 5.09A10.94 10.94 0 0 1 12 4c5 0 9 3.5 10 8-0.57 2.08-1.63 3.86-3.07 5.29"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  /></svg
-                >
-              {:else}
-                <!-- eye -->
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                  ><path
-                    d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  /><circle
-                    cx="12"
-                    cy="12"
-                    r="3"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  /></svg
-                >
-              {/if}
-            </button>
-          </div>
+          <PasswordInput
+            id="password"
+            name="password"
+            bind:value={password}
+            placeholder="Contraseña"
+            disabled={isLoading}
+          />
 
           <button
             on:click={loginWithEmail}
@@ -385,6 +329,11 @@
 </div>
 
 <style>
+  :global {
+    :root {
+      --primary-color: #35528c;
+    }
+  }
   .login-page {
     display: flex;
     min-height: calc(100vh - var(--topbar-h, 64px));
@@ -569,44 +518,50 @@
     background: #e5e7eb;
     margin: 1rem 0;
   }
+  .input {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.6rem;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    font-size: 0.95rem;
+    transition:
+      border-color 150ms ease,
+      box-shadow 150ms ease,
+      background 150ms ease;
+  }
+  /* Focus styles for inputs */
+  .input:focus {
+    outline: none;
+    border-color: #35528c;
+    box-shadow: 0 6px 18px rgba(53, 82, 140, 0.06);
+  }
   .password-wrapper {
     position: relative;
     display: flex;
     align-items: center;
   }
   .password-input {
-    /* increase right padding to accommodate larger toggle button */
-    padding-right: 56px;
+    padding-right: 48px;
     box-sizing: border-box;
     height: 40px;
     padding-top: 0.4rem;
     padding-bottom: 0.4rem;
   }
-  .password-input,
-  .input {
-    transition:
-      border-color 150ms ease,
-      box-shadow 150ms ease,
-      background 150ms ease;
-  }
-  .password-input:focus {
-    border-color: #35528c;
-  }
   .toggle-password {
     position: absolute;
-    right: 10px;
+    right: 4px;
     top: 50%;
-    transform: translateY(-70%);
+    transform: translateY(-50%);
     background: transparent;
     border: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    /* match input height for perfect alignment */
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     cursor: pointer;
-    color: #6b7280;
+    color: var(--primary-color);
     border-radius: 8px;
     box-shadow: none;
     padding: 4px;
@@ -617,44 +572,12 @@
     z-index: 5;
   }
   .toggle-password:hover {
-    background: rgba(0, 0, 0, 0.04);
-  }
-  .toggle-password svg {
-    display: block;
-    width: 18px;
-    height: 18px;
-    pointer-events: none;
+    color: #4a5fa1;
   }
   .toggle-password:focus {
     outline: none;
     box-shadow: 0 0 0 4px rgba(53, 82, 140, 0.06);
     border-radius: 8px;
-  }
-  .input {
-    width: 100%;
-    padding: 0.6rem 0.8rem;
-    margin-bottom: 0.6rem;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-    font-size: 0.95rem;
-  }
-  /* Focus styles for inputs (including password) */
-  .input:focus,
-  .password-input:focus {
-    outline: none;
-    border-color: #35528c;
-    box-shadow: 0 6px 18px rgba(53, 82, 140, 0.06);
-  }
-
-  /* When the wrapper has focus within (input focused), style both input and toggle */
-  .password-wrapper:focus-within .password-input {
-    border-color: #35528c;
-    box-shadow: 0 6px 18px rgba(53, 82, 140, 0.06);
-  }
-  .password-wrapper:focus-within .toggle-password {
-    color: #35528c;
-    background: rgba(53, 82, 140, 0.03);
-    box-shadow: 0 4px 10px rgba(53, 82, 140, 0.04);
   }
   .form-group {
     display: flex;
