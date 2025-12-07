@@ -43,19 +43,19 @@
     // Mapear sistema a variable de entorno
     if (system === "pos" || system === "interpos") {
       url = isDev
-        ? import.meta.env.VITE_POS_CALLBACK_URL_DEV ||
-          import.meta.env.VITE_POS_CALLBACK_URL
-        : import.meta.env.VITE_POS_CALLBACK_URL;
+        ? import.meta.env.PUBLIC_POS_CALLBACK_URL_DEV ||
+          import.meta.env.PUBLIC_POS_CALLBACK_URL
+        : import.meta.env.PUBLIC_POS_CALLBACK_URL;
     } else if (system === "app" || system === "interapp") {
       url = isDev
-        ? import.meta.env.VITE_APP_CALLBACK_URL_DEV ||
-          import.meta.env.VITE_APP_CALLBACK_URL
-        : import.meta.env.VITE_APP_CALLBACK_URL;
+        ? import.meta.env.PUBLIC_APP_CALLBACK_URL_DEV ||
+          import.meta.env.PUBLIC_APP_CALLBACK_URL
+        : import.meta.env.PUBLIC_APP_CALLBACK_URL;
     } else {
       // Fallback: usar la configuración del brandConfig si existe
       url =
         data?.brandConfig?.redirectUrlAfterLogin ||
-        import.meta.env.VITE_POS_CALLBACK_URL;
+        import.meta.env.PUBLIC_POS_CALLBACK_URL;
     }
 
     return url;

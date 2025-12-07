@@ -18,14 +18,14 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
         let redirectUrl: string;
 
         // Si next existe y no es el origen de InterAuth ni "/", respétalo
-        if (next && next !== process.env.VITE_AUTH_ORIGIN && next !== "/") {
+        if (next && next !== process.env.AUTH_ORIGIN && next !== "/") {
           redirectUrl = next;
         } else {
           // Fallback basado en system
           if (system === "pos") {
-            redirectUrl = process.env.VITE_POS_URL || "/";
+            redirectUrl = process.env.POS_URL || "/";
           } else if (system === "app") {
-            redirectUrl = process.env.VITE_APP_URL || "/";
+            redirectUrl = process.env.APP_URL || "/";
           } else {
             // Fallback final: raíz de InterAuth
             redirectUrl = "/";

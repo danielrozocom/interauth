@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
+import { createSupabaseServerClient } from "$lib/config/supabase";
 import { type Handle, redirect } from "@sveltejs/kit";
 import { config } from "dotenv";
 
@@ -6,27 +6,7 @@ import { config } from "dotenv";
 config();
 
 export const handle: Handle = async ({ event, resolve }) => {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "@supabase/ssr: Your project's URL and API key are required to create a Supabase client!\n" +
-        "Check your Supabase project's API settings to find these values\n" +
-        "https://supabase.com/dashboard/project/_/settings/api"
-    );
-  }
-
-  event.locals.supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll: () => event.cookies.getAll(),
-      setAll: (cookiesToSet) => {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          event.cookies.set(name, value, { ...options, path: "/" });
-        });
-      },
-    },
-  });
+  event.locals.supabase = createSupabaseServerClient(event);
 
   /**
    * Unlike `supabase.auth.getSession()`, which returns the session _without_
