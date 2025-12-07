@@ -1,20 +1,19 @@
 import { redirect } from "@sveltejs/kit";
+import type { PageServerLoad } from "./$types";
 
 const SYSTEM_REDIRECTS = {
   interpos: "https://pos.interfundeoms.edu.co",
-  interfundeoms: "https://interfundeoms.edu.co",
   otro: "https://loquesiga.interfundeoms.edu.co",
 };
 
-const DEFAULT_REDIRECT = "https://interfundeoms.edu.co";
+const DEFAULT_REDIRECT = "https://pos.interfundeoms.edu.co";
 
 const ALLOWED_DOMAINS = [
-  "https://interfundeoms.edu.co",
   "https://auth.interfundeoms.edu.co",
   "https://supa.interfundeoms.edu.co",
 ];
 
-export async function load({ url, locals }) {
+export const load: PageServerLoad = async ({ url, locals }) => {
   const code = url.searchParams.get("code");
   const system = url.searchParams.get("system");
   const redirectTo = url.searchParams.get("redirect_to");
@@ -75,4 +74,4 @@ export async function load({ url, locals }) {
         "Error inesperado durante la autenticación. Contacta al soporte si persiste.",
     };
   }
-}
+};
