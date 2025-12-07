@@ -15,8 +15,7 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Copy .env as .env.production for Vite
-COPY .env .env.production
+# Environment variables should be set in Dokploy or build args
 
 # Build the application
 RUN pnpm build
