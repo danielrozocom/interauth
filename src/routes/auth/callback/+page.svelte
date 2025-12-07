@@ -1,13 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { createBrowserClient } from "@supabase/ssr";
+  import { createSupabaseBrowserClient } from "$lib/supabase/browserClient";
 
   onMount(async () => {
     try {
-      const supabase = createBrowserClient(
-        import.meta.env.PUBLIC_SUPABASE_URL,
-        import.meta.env.PUBLIC_SUPABASE_ANON_KEY
-      );
+      const supabase = createSupabaseBrowserClient();
 
       // Procesar la URL devuelta por el proveedor (token en fragmento/url)
       const { data, error } = await supabase.auth.getSessionFromUrl({

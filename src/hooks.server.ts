@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "$lib/config/supabase";
+import { createSupabaseServerClient } from "$lib/supabase/serverClient";
 import { type Handle, redirect } from "@sveltejs/kit";
 import { config } from "dotenv";
 

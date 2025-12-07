@@ -11,6 +11,18 @@
   import type { LayoutData } from "./$types";
   import "../app.css";
 
+  // Debug logs for env vars
+  if (browser) {
+    console.log(
+      "DEBUG PUBLIC_SUPABASE_URL",
+      import.meta.env.PUBLIC_SUPABASE_URL
+    );
+    console.log(
+      "DEBUG PUBLIC_SUPABASE_ANON_KEY",
+      import.meta.env.PUBLIC_SUPABASE_ANON_KEY ? "SET" : "UNSET"
+    );
+  }
+
   // Recibir datos del servidor (modo runes): usar $props()
   const { data, children } = $props<{ data: LayoutData; children: any }>();
 

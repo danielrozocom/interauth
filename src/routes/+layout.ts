@@ -1,4 +1,4 @@
-import { createSupabaseBrowserClient } from "$lib/config/supabase";
+import { createSupabaseBrowserClient } from "$lib/supabase/browserClient";
 import { isBrowser } from "@supabase/ssr";
 import type { LayoutLoad } from "./$types";
 
