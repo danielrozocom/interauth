@@ -7,6 +7,9 @@ const config = {
 
   kit: {
     adapter: adapter({ out: "build" }),
+    // NOTE: Vite options are handled in `vite.config.ts/js` so tooling that
+    // consumes JavaScript Vite configs (like some deployment builders) will
+    // reliably pick them up.
   },
 };
 
