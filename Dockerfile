@@ -15,6 +15,18 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Set build-time environment variables
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_APP_NAME
+ARG VITE_POS_CALLBACK_URL
+ARG VITE_APP_CALLBACK_URL
+ARG VITE_POS_CALLBACK_URL_DEV
+ARG VITE_APP_CALLBACK_URL_DEV
+ARG VITE_POS_URL
+ARG VITE_APP_URL
+ARG VITE_AUTH_ORIGIN
+
 # Build the application
 RUN pnpm build
 

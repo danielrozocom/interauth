@@ -1,5 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { type Handle, redirect } from "@sveltejs/kit";
+import { config } from "dotenv";
+
+// Load environment variables from .env file
+config();
 
 export const handle: Handle = async ({ event, resolve }) => {
   event.locals.supabase = createServerClient(
