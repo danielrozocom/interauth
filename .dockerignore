@@ -1,73 +1,10 @@
-# ============================================================================
-# Docker Ignore File
-# ============================================================================
-# This file prevents unnecessary files from being copied into Docker images.
-# This reduces build context size and ensures dev dependencies don't pollute prod.
-
-# Version control
+node_modules
 .git
-.gitignore
-.gitattributes
-
-# Documentation
-README.md
-CHANGELOG.md
-DEVELOPMENT.md
-GETTING_STARTED.md
-INDEX.md
-INSTALLATION.md
-PRODUCTION_DEPLOYMENT.md
-PROJECT_STRUCTURE.md
-QUICKSTART.md
-START_HERE.md
-SUMMARY.md
-SUPABASE_CONFIG.md
-TESTING.md
-
-# Development files
+.svelte-kit
+build
+dist
 .env
-.env.local
-.env.*.local
-.vscode
-.idea
-*.swp
-*.swo
-*~
-
-# Package manager
-node_modules/
-.pnpm-store/
-
-# Build outputs (should not be needed in container build)
-build/
-dist/
-.svelte-kit/
-
-# Vite
-.vite/
-
-# Development server
-5173
-
-# Temporary files
-.DS_Store
-Thumbs.db
-*.log
-npm-debug.log*
-pnpm-debug.log*
-
-# Testing
-coverage/
-.nyc_output/
-
-# Development tools
-docker-compose.dev.yml
-Dockerfile.dev
-scripts/
-.dockerignore
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
+.env.*
+Dockerfile
+docker-compose*
+README.md

@@ -33,19 +33,19 @@ InterAuth es un intermediario de autenticación que permite a múltiples aplicac
 
 ## 📚 Documentación Completa
 
-| Documento | Descripción | Para Quién |
-|-----------|-------------|------------|
-| **[QUICKSTART.md](QUICKSTART.md)** | ⚡ Inicio rápido (5 min) | Todos |
-| **[INSTALLATION.md](INSTALLATION.md)** | 📦 Instalación detallada paso a paso | DevOps / Nuevos usuarios |
-| **[DEVELOPMENT.md](DEVELOPMENT.md)** | 🔧 Guía completa de desarrollo | Developers |
-| **[SUPABASE_CONFIG.md](SUPABASE_CONFIG.md)** | 🔒 Configuración de Supabase Auth | Backend / DevOps |
-| **[EXAMPLES.md](EXAMPLES.md)** | 💡 Ejemplos prácticos de uso | Developers |
-| **[TESTING.md](TESTING.md)** | ✅ Guía de testing y verificación | QA / Testers |
-| **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** | 📊 Estructura del proyecto | Todos |
-| **[PNPM.md](PNPM.md)** | 📦 Guía de uso de pnpm | Developers |
-| **[SUMMARY.md](SUMMARY.md)** | 🎯 Resumen ejecutivo | Product Managers |
-| **[CHILD_APP_EXAMPLE.ts](CHILD_APP_EXAMPLE.ts)** | 🔗 Integración con apps hijas | Frontend Devs |
-| **[CHANGELOG.md](CHANGELOG.md)** | 📝 Historial de cambios | Todos |
+| Documento                                        | Descripción                          | Para Quién               |
+| ------------------------------------------------ | ------------------------------------ | ------------------------ |
+| **[QUICKSTART.md](QUICKSTART.md)**               | ⚡ Inicio rápido (5 min)             | Todos                    |
+| **[INSTALLATION.md](INSTALLATION.md)**           | 📦 Instalación detallada paso a paso | DevOps / Nuevos usuarios |
+| **[DEVELOPMENT.md](DEVELOPMENT.md)**             | 🔧 Guía completa de desarrollo       | Developers               |
+| **[SUPABASE_CONFIG.md](SUPABASE_CONFIG.md)**     | 🔒 Configuración de Supabase Auth    | Backend / DevOps         |
+| **[EXAMPLES.md](EXAMPLES.md)**                   | 💡 Ejemplos prácticos de uso         | Developers               |
+| **[TESTING.md](TESTING.md)**                     | ✅ Guía de testing y verificación    | QA / Testers             |
+| **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** | 📊 Estructura del proyecto           | Todos                    |
+| **[PNPM.md](PNPM.md)**                           | 📦 Guía de uso de pnpm               | Developers               |
+| **[SUMMARY.md](SUMMARY.md)**                     | 🎯 Resumen ejecutivo                 | Product Managers         |
+| **[CHILD_APP_EXAMPLE.ts](CHILD_APP_EXAMPLE.ts)** | 🔗 Integración con apps hijas        | Frontend Devs            |
+| **[CHANGELOG.md](CHANGELOG.md)**                 | 📝 Historial de cambios              | Todos                    |
 
 ---
 
@@ -97,29 +97,56 @@ En tu instancia de Supabase (self-hosted), asegúrate de:
    - `https://admin.midominio.com/auth/callback`
    - `https://tienda.midominio.com/auth/callback`
 
-### 5. Ejecutar en desarrollo
+### 5. Ejecución y Despliegue
+
+#### Desarrollo Local
 
 ```bash
+# Instalar dependencias
+pnpm install
+
+# Servidor de desarrollo
 pnpm dev
 ```
 
-La aplicación estará disponible en `http://localhost:5173`
+#### Producción Local
+
+```bash
+# Construir la aplicación
+pnpm build
+
+# Iniciar servidor de producción
+pnpm start
+```
+
+#### Docker (Dokploy)
+
+```bash
+# Construir imagen
+docker build -t interauth .
+
+# Ejecutar contenedor
+docker run -p 3000:3000 --env-file .env interauth
+```
 
 ## 🎨 Sistemas Configurados
 
 El proyecto viene con 3 sistemas preconfigurados:
 
 ### InterPOS
+
 - **URL**: `/?system=interpos`
 - **Color**: `#35528C` (azul)
 - **Redirect**: `https://interpos.midominio.com/auth/callback`
 
 ### Panel Administrativo
+
 - **URL**: `/?system=admin`
 - **Color**: `#008080` (teal)
 - **Redirect**: `https://admin.midominio.com/auth/callback`
 
 ### Tienda Inter
+
 - **URL**: `/?system=tienda`
 - **Color**: `#A42323` (rojo)
 - **Redirect**: `https://tienda.midominio.com/auth/callback`
@@ -131,13 +158,13 @@ Para agregar un nuevo sistema, edita el archivo `src/lib/brandConfig.ts`:
 ```typescript
 const BRAND_CONFIG: Record<string, BrandConfig> = {
   // ... sistemas existentes ...
-  
+
   // Nuevo sistema
-  'mi-nuevo-sistema': {
-    name: 'Mi Nuevo Sistema',
-    primaryColor: '#FF5733',
-    redirectUrlAfterLogin: 'https://mi-sistema.midominio.com/auth/callback'
-  }
+  "mi-nuevo-sistema": {
+    name: "Mi Nuevo Sistema",
+    primaryColor: "#FF5733",
+    redirectUrlAfterLogin: "https://mi-sistema.midominio.com/auth/callback",
+  },
 };
 ```
 
@@ -176,6 +203,7 @@ https://auth.midominio.com/?system=NOMBRE_SISTEMA
 ```
 
 Ejemplo:
+
 ```
 https://auth.midominio.com/?system=interpos
 ```
@@ -225,15 +253,18 @@ Recuerda configurar las variables de entorno en tu plataforma de deploy.
 ## 🐛 Troubleshooting
 
 ### Error: "Sistema no encontrado"
+
 - Verifica que el parámetro `?system=...` esté en la URL
 - Revisa que el sistema esté configurado en `src/lib/brandConfig.ts`
 
 ### Error al iniciar sesión con Google
+
 - Confirma que Google OAuth esté habilitado en Supabase
 - Verifica que las URLs de redirect estén en `GOTRUE_URI_ALLOW_LIST`
 - Revisa las credenciales en `.env`
 
 ### Los colores no se aplican
+
 - Asegúrate de que el navegador tenga JavaScript habilitado
 - Verifica que el parámetro `?system=...` sea válido
 

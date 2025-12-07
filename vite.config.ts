@@ -8,6 +8,12 @@ export default defineConfig({
   // listing packages here prevents the "Could not auto-determine entry
   // point" warning and ensures fast dev-server cold starts.
   optimizeDeps: {
+    entries: [
+      "src/routes/**/*.svelte",
+      "src/routes/**/*.ts",
+      "src/routes/**/*.js",
+      "src/app.html",
+    ],
     include: [
       "@supabase/supabase-js",
       "@supabase/auth-ui-svelte",
