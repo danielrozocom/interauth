@@ -28,8 +28,10 @@ ARG VITE_APP_URL
 ARG VITE_AUTH_ORIGIN
 
 # Create .env.production from build args for Vite
-RUN echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL" > .env.production && \
-    echo "VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY" >> .env.production && \
+RUN echo "PUBLIC_SUPABASE_URL=$VITE_SUPABASE_URL" > .env.production && \
+    echo "SUPABASE_URL=$VITE_SUPABASE_URL" >> .env.production && \
+    echo "PUBLIC_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY" >> .env.production && \
+    echo "SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY" >> .env.production && \
     echo "VITE_APP_NAME=$VITE_APP_NAME" >> .env.production && \
     echo "VITE_POS_CALLBACK_URL=$VITE_POS_CALLBACK_URL" >> .env.production && \
     echo "VITE_APP_CALLBACK_URL=$VITE_APP_CALLBACK_URL" >> .env.production && \
