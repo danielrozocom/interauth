@@ -15,29 +15,8 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
-# Set build-time environment variables
-ARG VITE_SUPABASE_URL
-ARG VITE_SUPABASE_ANON_KEY
-ARG VITE_APP_NAME
-ARG VITE_POS_CALLBACK_URL
-ARG VITE_APP_CALLBACK_URL
-ARG VITE_POS_CALLBACK_URL_DEV
-ARG VITE_APP_CALLBACK_URL_DEV
-ARG VITE_POS_URL
-ARG VITE_APP_URL
-ARG VITE_AUTH_ORIGIN
-
-# Create .env.production from build args for Vite
-RUN echo "PUBLIC_SUPABASE_URL=$VITE_SUPABASE_URL" > .env.production && \
-    echo "PUBLIC_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY" >> .env.production && \
-    echo "PUBLIC_APP_NAME=$VITE_APP_NAME" >> .env.production && \
-    echo "PUBLIC_POS_CALLBACK_URL=$VITE_POS_CALLBACK_URL" >> .env.production && \
-    echo "PUBLIC_APP_CALLBACK_URL=$VITE_APP_CALLBACK_URL" >> .env.production && \
-    echo "PUBLIC_POS_CALLBACK_URL_DEV=$VITE_POS_CALLBACK_URL_DEV" >> .env.production && \
-    echo "PUBLIC_APP_CALLBACK_URL_DEV=$VITE_APP_CALLBACK_URL_DEV" >> .env.production && \
-    echo "PUBLIC_POS_URL=$VITE_POS_URL" >> .env.production && \
-    echo "PUBLIC_APP_URL=$VITE_APP_URL" >> .env.production && \
-    echo "PUBLIC_AUTH_ORIGIN=$VITE_AUTH_ORIGIN" >> .env.production
+# Copy .env as .env.production for Vite
+COPY .env .env.production
 
 # Build the application
 RUN pnpm build
