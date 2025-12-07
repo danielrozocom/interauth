@@ -1,8 +1,8 @@
 /**
- * Layout Server Load Function
+ * Layout Server Load Function for Auth Routes
  *
- * Este archivo maneja la lógica del lado del servidor para el layout raíz.
- * Extrae el parámetro 'system' de la URL y resuelve la configuración del brand.
+ * Este archivo maneja la lógica del lado del servidor para las rutas de auth.
+ * Permite que rutas con code no requieran system parameter.
  */
 
 import { error, redirect } from "@sveltejs/kit";
@@ -17,20 +17,14 @@ export const load: LayoutServerLoad = async ({
   const { session, user } = await safeGetSession();
 
   // Extraer el parámetro 'system' de la URL
-  const systemParam = url.searchParams.get("system");
-
-  // System parameter is always required
-  if (!systemParam) {
-    throw error(400, "System parameter is required");
-  }
+  const systemParam = url.searchParams.get("system") || "app";
 
   // Resolver la configuración del brand
   const brandConfig = resolveBrand(systemParam);
 
   // Si no existe la configuración, retornar error
   if (!brandConfig) {
-    // Si el 'system' no está configurado, redirigimos al dominio principal
-    throw redirect(307, "https://interfundeoms.edu.co");
+    throw error(400, "Invalid system configuration");
   }
 
   // Retornar los datos al cliente
