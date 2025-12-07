@@ -6,6 +6,16 @@ Esta guía rápida explica cómo asegurar que Dokploy use el Dockerfile de produ
 
 - Usa `Dockerfile` (archivo raíz) para producción — NO uses `Dockerfile.dev`.
 - Asegúrate de que el comando de arranque no esté sobrescrito: debe ser `pnpm start` (o dejar que el CMD del Dockerfile se aplique).
+
+  ⚠️ Nota: Si ves un error en la fase de build diciendo `/bin/sh: pnpm: not found`, asegúrate de que el `Dockerfile` de producción habilite corepack/pnpm en la etapa `runner`. El `Dockerfile` debe contener algo como:
+
+```Dockerfile
+# In the runner stage
+RUN npm install -g corepack@0.24.1 && corepack enable
+```
+
+Esto garantiza que `pnpm` esté disponible cuando el contenedor instale solo dependencias de producción o ejecute `pnpm start`.
+
 - Establece `NODE_ENV=production` en las variables de entorno de Dokploy.
 
 ---

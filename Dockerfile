@@ -59,6 +59,11 @@ WORKDIR /app
 # Create a non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
+# Ensure pnpm is available in the runner stage as well. The builder stage enabled
+# corepack earlier (to run pnpm during build), so we must enable it here too
+# otherwise `pnpm` will be missing and `pnpm install --prod` will fail.
+RUN npm install -g corepack@0.24.1 && corepack enable
+
 # Copy package manifests only (needed for 'pnpm start')
 COPY --from=builder /app/package.json /app/pnpm-lock.yaml* ./
 
