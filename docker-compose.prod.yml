@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 # ============================================================================
 # Production Docker Compose Configuration
@@ -23,27 +23,34 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Optional: Configure build args if needed
+      # Build args for client-side environment variables
       args:
         NODE_ENV: production
-    
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_APP_NAME: ${VITE_APP_NAME}
+        VITE_POS_CALLBACK_URL: ${VITE_POS_CALLBACK_URL}
+        VITE_APP_CALLBACK_URL: ${VITE_APP_CALLBACK_URL}
+        VITE_POS_CALLBACK_URL_DEV: ${VITE_POS_CALLBACK_URL_DEV}
+        VITE_APP_CALLBACK_URL_DEV: ${VITE_APP_CALLBACK_URL_DEV}
+
     # Port mapping: container:host
     ports:
       - "3000:3000"
-    
+
     # Environment variables for production
     environment:
       # CRITICAL: Ensure NODE_ENV is set to production
       NODE_ENV: production
       # These MUST be set by the deployment platform
       # (Dokploy, Railway, Coolify, etc.)
-      # SUPABASE_URL: ${SUPABASE_URL}
-      # SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-      # APP_NAME: ${APP_NAME}
-    
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      APP_NAME: ${APP_NAME}
+
     # Restart policy for production
     restart: unless-stopped
-    
+
     # Resource limits (optional, adjust based on your needs)
     # deploy:
     #   resources:
@@ -53,24 +60,29 @@ services:
     #     reservations:
     #       cpus: '0.5'
     #       memory: 256M
-    
+
     # Health check
     healthcheck:
-      test: [ "CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" ]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})",
+        ]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 5s
-    
+
     # No volumes in production (immutable container)
     # volumes: []
-    
+
     # Logging configuration (optional)
     # logging:
     #   driver: "json-file"
     #   options:
     #     max-size: "10m"
     #     max-file: "3"
-
 # Optional: If you have other services (e.g., Postgres, Redis)
 # they would be defined here as well
