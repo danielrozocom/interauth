@@ -1,5 +1,4 @@
 import { redirect } from "@sveltejs/kit";
-import { createSupabaseServerClient } from "$lib/supabase/serverClient";
 
 const SYSTEM_REDIRECTS = {
   interpos: "https://pos.interfundeoms.edu.co",
@@ -15,7 +14,7 @@ const ALLOWED_DOMAINS = [
   "https://supa.interfundeoms.edu.co",
 ];
 
-export async function load({ url, request, cookies }: any) {
+export async function load({ url, locals }) {
   const code = url.searchParams.get("code");
   const system = url.searchParams.get("system");
   const redirectTo = url.searchParams.get("redirect_to");
@@ -26,7 +25,7 @@ export async function load({ url, request, cookies }: any) {
   }
 
   // Procesar el código de autenticación
-  const supabase = createSupabaseServerClient({ request, cookies, url });
+  const supabase = locals.supabase;
 
   try {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);

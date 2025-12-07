@@ -14,6 +14,9 @@
   let forgotMode = false;
   let infoMessage: string | null = null;
 
+  // Mostrar error del servidor si existe
+  $: if ((data as any).error) infoMessage = (data as any).error;
+
   // Función para validar formato de email
   function isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -65,7 +68,9 @@
     loadingOAuth = true;
 
     try {
-      const { data: res, error } = await data.supabase.auth.signInWithOAuth({
+      const { data: res, error } = await (
+        data as any
+      ).supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: callbackUrl,
@@ -97,7 +102,9 @@
     }
 
     try {
-      const { data: res, error } = await data.supabase.auth.signInWithPassword({
+      const { data: res, error } = await (
+        data as any
+      ).supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -142,10 +149,11 @@
     }
 
     try {
-      const { data: res, error } =
-        await data.supabase.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: callbackUrl,
-        });
+      const { data: res, error } = await (
+        data as any
+      ).supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: callbackUrl,
+      });
 
       if (error) throw error;
 

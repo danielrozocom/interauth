@@ -7,9 +7,7 @@
       const supabase = createSupabaseBrowserClient();
 
       // Procesar la URL devuelta por el proveedor (token en fragmento/url)
-      const { data, error } = await supabase.auth.getSessionFromUrl({
-        storeSession: true,
-      });
+      const { data, error } = await supabase.auth.getSession();
 
       if (error) {
         console.error("Error al obtener la sesión desde la URL:", error);
