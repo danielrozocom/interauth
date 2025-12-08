@@ -13,7 +13,10 @@
 
   // Debug logs for env vars
   if (browser) {
-    console.log("DEBUG PUBLIC_SUPABASE_URL", import.meta.env.PUBLIC_SUPABASE_URL);
+    console.log(
+      "DEBUG PUBLIC_SUPABASE_URL",
+      import.meta.env.PUBLIC_SUPABASE_URL
+    );
     console.log(
       "DEBUG PUBLIC_SUPABASE_ANON_KEY",
       import.meta.env.PUBLIC_SUPABASE_ANON_KEY ? "SET" : "UNSET"
@@ -47,7 +50,9 @@
     href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet"
   />
-  <title>Login | {data.brandConfig?.name || "InterAuth"}</title>
+  <title
+    >Login{data.brandConfig?.name ? ` | ${data.brandConfig.name}` : ""}</title
+  >
 </svelte:head>
 
 <main class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

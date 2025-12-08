@@ -43,14 +43,6 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     redirectUrlAfterLogin: "https://app.interfundeoms.edu.co/auth/callback",
     subtitle: "Login",
   },
-
-  // Auth (Portal propio)
-  auth: {
-    name: "InterAuth",
-    primaryColor: "#35528C",
-    redirectUrlAfterLogin: "/callback", // Local callback
-    subtitle: "Portal",
-  },
 };
 
 /**
@@ -125,6 +117,36 @@ export function resolveBrand(
     ...config,
     primaryColor: config.primaryColor || DEFAULT_PRIMARY_COLOR,
   };
+}
+
+/**
+ * Lista blanca de parámetros que forman parte de los flujos de Supabase (GoTrue / OAuth / Magic Links)
+ * Si cualquiera de estos parámetros está presente en la URL, no exigimos `system`
+ */
+export const SUPABASE_RESERVED_PARAMS = [
+  "code",
+  "token",
+  "type",
+  "redirect_to",
+  "provider",
+];
+
+/**
+ * Comprueba si la colección de searchParams incluye alguno de los parámetros reservados
+ */
+export function hasSupabaseReservedParam(
+  searchParams: URLSearchParams | null | undefined
+): boolean {
+  if (!searchParams) return false;
+  return SUPABASE_RESERVED_PARAMS.some((p) => searchParams.has(p));
+}
+
+/**
+ * Comprueba si un sistema (string) resuelve a una configuración válida
+ */
+export function isSystemValid(system: string | null | undefined): boolean {
+  if (!system) return false;
+  return resolveBrand(system) !== null;
 }
 
 /**

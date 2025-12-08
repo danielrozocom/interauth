@@ -1,5 +1,9 @@
 import { redirect } from "@sveltejs/kit";
-import { resolveBrand } from "$lib/brandConfig";
+import {
+  resolveBrand,
+  hasSupabaseReservedParam,
+  isSystemValid,
+} from "$lib/brandConfig";
 import type { PageServerLoad } from "./$types";
 
 const SYSTEM_REDIRECTS = {
@@ -17,6 +21,7 @@ const ALLOWED_DOMAINS = [
 export const load: PageServerLoad = async ({ url, locals }) => {
   const code = url.searchParams.get("code");
   const system = url.searchParams.get("system");
+  const hasSupabaseFlow = hasSupabaseReservedParam(url.searchParams);
 
   // 1. Procesar intercambio de código (Sign In with Google/Magic Link)
   if (code) {
@@ -90,5 +95,21 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     }
   }
 
-  return {};
+  // Decide si este acceso es válido en base a `system` y a la presencia de parámetros de Supabase
+  const brandCfg = isSystemValid(system) ? resolveBrand(system) : null;
+
+  // Si no es un flujo de Supabase y no hay system válido -> mostrar pantalla de acceso inválido
+  if (!hasSupabaseFlow && !brandCfg) {
+    return {
+      invalidAccess: true,
+      system: system || null,
+      brandConfig: null,
+    };
+  }
+
+  return {
+    invalidAccess: false,
+    system: system || null,
+    brandConfig: brandCfg,
+  };
 };

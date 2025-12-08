@@ -2,6 +2,8 @@
   import type { PageData } from "./$types";
   import PasswordInput from "$lib/components/PasswordInput.svelte";
   import { onMount, onDestroy } from "svelte";
+  import { goto } from "$app/navigation";
+  import { supabase } from "$lib/supabaseClient";
 
   export let data: PageData;
 
@@ -259,15 +261,13 @@
   async function loginWithGoogle() {
     isGoogleSubmitting = true;
     try {
-      const { data: res, error } = await (
-        data as any
-      ).supabase.auth.signInWithOAuth({
+      const redirectTo = data?.system
+        ? `${window.location.origin}/?system=${data.system}`
+        : `${window.location.origin}/`;
+
+      const { data: res } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/?system=${
-            (data as any).system || "auth"
-          }`,
-        },
+        options: { redirectTo },
       });
       if (res?.url) window.location.href = res.url;
     } catch (err) {
@@ -291,16 +291,22 @@
 
 <svelte:head>
   <title
-    >{currentStep === "login" ? "Login" : "Recuperación de cuenta"} | {(
-      data as any
-    )?.brandConfig?.name || "InterAuth"}</title
+    >{data.invalidAccess
+      ? "Acceso no válido"
+      : currentStep === "login"
+        ? "Login"
+        : "Recuperación de cuenta"}{data.brandConfig?.name
+      ? ` | ${data.brandConfig.name}`
+      : ""}</title
   >
 </svelte:head>
 
 <div class="login-page">
   <div class="card">
     <div class="brand">
-      <h1>{(data as any)?.brandConfig?.name || "InterAuth"}</h1>
+      {#if data.brandConfig?.name}
+        <h1>{data.brandConfig.name}</h1>
+      {/if}
     </div>
     <div class="card-body">
       <!-- Header Dinámico -->
@@ -383,12 +389,14 @@
             class="link-btn"
             disabled={isLoading}
             on:click={() => {
-              currentStep = "email";
-              password = ""; // Clear password to prevent pre-fill
-              infoMessage = null;
+              const system = data.system;
+              const url = system
+                ? `/recover-password?system=${system}`
+                : "/recover-password";
+              goto(url);
             }}
           >
-            Olvidé mi contraseña
+            ¿Olvidaste tu contraseña?
           </button>
         </div>
 
