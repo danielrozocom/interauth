@@ -444,8 +444,11 @@
           {/if}
         </button>
 
+        <div class="separator-hr"></div>
+
         <p class="help-text mt-4">
-          Si necesitas ayuda contacta al administrador.
+          ¿Necesitas ayuda? <br />
+          Contacta al administrador del sistema.
         </p>
 
         <!-- VISTA: PASO 1 (EMAIL) -->
