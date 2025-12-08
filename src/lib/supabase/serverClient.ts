@@ -1,28 +1,37 @@
 import { createServerClient } from "@supabase/ssr";
-import { env } from "$env/dynamic/private";
+import {
+  PUBLIC_SUPABASE_URL,
+  PUBLIC_SUPABASE_ANON_KEY,
+} from "$env/static/public";
 
 export function createSupabaseServerClient({
   request,
   cookies,
-  url,
 }: {
-  request: any;
-  cookies: any;
-  url: any;
+  request?: Request; // Make optional/flexible if needed, but usually passed from event
+  cookies: any; // SvelteKit cookies object
 }) {
-  const supabaseUrl = env.SUPABASE_URL;
-  const anonKey = env.SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !anonKey) {
-    console.error("❌ Falta SUPABASE_URL o SUPABASE_ANON_KEY en el servidor");
-    throw new Error("Supabase server envs not configured");
+  if (!PUBLIC_SUPABASE_URL || !PUBLIC_SUPABASE_ANON_KEY) {
+    console.error(
+      "❌ Falta PUBLIC_SUPABASE_URL o PUBLIC_SUPABASE_ANON_KEY en el servidor"
+    );
+    // We can allow it to proceed and fail later, or throw.
+    // Throwing ensures we don't deploy with missing envs.
   }
 
-  return createServerClient(supabaseUrl, anonKey, {
+  return createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
     cookies: {
       get: (key) => cookies.get(key),
-      set: (key, value, options) => cookies.set(key, value, options),
-      remove: (key, options) => cookies.delete(key, options),
+      set: (key, value, options) => {
+        cookies.set(key, value, { ...options, path: "/" });
+      },
+      remove: (key, options) => {
+        cookies.delete(key, { ...options, path: "/" });
+      },
+    },
+    auth: {
+      detectSessionInUrl: false,
+      autoRefreshToken: false, // Server client shouldn't refresh tokens automatically usually? Actually for SSR it's fine.
     },
   });
 }

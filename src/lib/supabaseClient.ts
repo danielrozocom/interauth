@@ -12,39 +12,32 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { browser } from "$app/environment";
-// Obtener variables de entorno: en cliente usamos `PUBLIC_` y en servidor `process.env`
-const supabaseUrl = browser
-  ? import.meta.env.PUBLIC_SUPABASE_URL
-  : process.env.SUPABASE_URL;
-const supabaseAnonKey = browser
-  ? import.meta.env.PUBLIC_SUPABASE_ANON_KEY
-  : process.env.SUPABASE_ANON_KEY;
+import {
+  PUBLIC_SUPABASE_URL,
+  PUBLIC_SUPABASE_ANON_KEY,
+} from "$env/static/public";
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  // En servidor es crítico: lanzar un error claro para facilitar debugging en logs
-  if (!browser) {
-    console.error(
-      "Supabase environment variables missing. Ensure SUPABASE_URL and SUPABASE_ANON_KEY are set."
-    );
-  } else {
-    console.error(
-      "PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY must be set for the client."
-    );
-  }
+if (!PUBLIC_SUPABASE_URL || !PUBLIC_SUPABASE_ANON_KEY) {
+  console.error(
+    "❌ Missing PUBLIC_SUPABASE_URL or PUBLIC_SUPABASE_ANON_KEY in supabaseClient.ts"
+  );
 }
 
 /**
  * Cliente de Supabase para toda la aplicación
  * Usa este cliente para todas las operaciones de autenticación
  */
-export const supabase = createClient(supabaseUrl || "", supabaseAnonKey || "", {
-  auth: {
-    // Configuración de persistencia de sesión
-    persistSession: true,
-    autoRefreshToken: true,
-    // We disable automatic URL fragment/session detection to let the
-    // dedicated `/auth/callback` page call `getSessionFromUrl` explicitly.
-    detectSessionInUrl: false,
-  },
-});
+export const supabase = createClient(
+  PUBLIC_SUPABASE_URL || "",
+  PUBLIC_SUPABASE_ANON_KEY || "",
+  {
+    auth: {
+      // Configuración de persistencia de sesión
+      persistSession: true,
+      autoRefreshToken: true,
+      // We disable automatic URL fragment/session detection to let the
+      // dedicated `/auth/callback` page call `getSessionFromUrl` explicitly.
+      detectSessionInUrl: false,
+    },
+  }
+);

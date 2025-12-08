@@ -37,9 +37,7 @@ export const load: LayoutServerLoad = async ({
   return {
     system: systemParam,
     brandConfig: brandConfig as BrandConfig,
-    // Exponer la URL de Supabase al cliente para construir flujos de OAuth
-    supabaseUrl: process.env.SUPABASE_URL || null,
-    appName: process.env.APP_NAME || null,
+    // session and user are enough for the layout
     session,
     user,
     cookies: cookies.getAll(),

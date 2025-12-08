@@ -2,7 +2,10 @@ import { createSupabaseServerClient } from "$lib/supabase/serverClient";
 import { type Handle, redirect } from "@sveltejs/kit";
 
 export const handle: Handle = async ({ event, resolve }) => {
-  event.locals.supabase = createSupabaseServerClient(event);
+  event.locals.supabase = createSupabaseServerClient({
+    request: event.request,
+    cookies: event.cookies,
+  });
 
   /**
    * Unlike `supabase.auth.getSession()`, which returns the session _without_
