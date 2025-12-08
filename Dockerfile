@@ -27,6 +27,9 @@ ARG VITE_POS_URL
 ARG VITE_APP_URL
 ARG VITE_AUTH_ORIGIN
 
+# Set NODE_ENV for production build
+ENV NODE_ENV=production
+
 # Create .env.production from build args for Vite
 RUN echo "PUBLIC_SUPABASE_URL=$VITE_SUPABASE_URL" > .env.production && \
     echo "SUPABASE_URL=$VITE_SUPABASE_URL" >> .env.production && \

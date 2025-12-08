@@ -28,18 +28,6 @@ export function createSupabaseBrowserClient(fetch?: typeof globalThis.fetch) {
     global: {
       fetch,
     },
-    cookies: {
-      get(key) {
-        const cookie = parse(document.cookie);
-        return cookie[key];
-      },
-      set(key, value) {
-        document.cookie = `${key}=${value}; path=/`;
-      },
-      remove(key) {
-        document.cookie = `${key}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-      },
-    },
   });
 }
 

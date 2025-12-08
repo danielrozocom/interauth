@@ -47,7 +47,7 @@
     href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap"
     rel="stylesheet"
   />
-  <title>Autenticación - {data.brandConfig?.name || "InterAuth"}</title>
+  <title>Login | {data.brandConfig?.name || "InterAuth"}</title>
 </svelte:head>
 
 <main class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
