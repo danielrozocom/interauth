@@ -1,8 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
-import {
-  PUBLIC_SUPABASE_URL,
-  PUBLIC_SUPABASE_ANON_KEY,
-} from "$env/static/public";
+import { env } from "$env/dynamic/private";
 
 export function createSupabaseServerClient({
   request,
@@ -11,15 +8,20 @@ export function createSupabaseServerClient({
   request?: Request; // Make optional/flexible if needed, but usually passed from event
   cookies: any; // SvelteKit cookies object
 }) {
-  if (!PUBLIC_SUPABASE_URL || !PUBLIC_SUPABASE_ANON_KEY) {
+  const supabaseUrl = env.PUBLIC_SUPABASE_URL || env.SUPABASE_URL;
+  const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
     console.error(
-      "❌ Falta PUBLIC_SUPABASE_URL o PUBLIC_SUPABASE_ANON_KEY en el servidor"
+      `❌ Falta PUBLIC_SUPABASE_URL o PUBLIC_SUPABASE_ANON_KEY en el servidor.
+       Values seen: URL=${supabaseUrl ? "SET" : "UNSET"}, KEY=${
+        supabaseAnonKey ? "SET" : "UNSET"
+      }`
     );
-    // We can allow it to proceed and fail later, or throw.
-    // Throwing ensures we don't deploy with missing envs.
+    // If we are strictly crashing here, it's good, but lets make sure we read the right vars.
   }
 
-  return createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+  return createServerClient(supabaseUrl || "", supabaseAnonKey || "", {
     cookies: {
       get: (key) => cookies.get(key),
       set: (key, value, options) => {

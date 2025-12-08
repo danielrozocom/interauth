@@ -8,6 +8,7 @@
 import { error, redirect } from "@sveltejs/kit";
 import { resolveBrand, type BrandConfig } from "$lib/brandConfig";
 import type { LayoutServerLoad } from "./$types";
+import { env } from "$env/dynamic/private";
 
 export const load: LayoutServerLoad = async ({
   url,
@@ -33,11 +34,17 @@ export const load: LayoutServerLoad = async ({
     throw redirect(307, "https://interfundeoms.edu.co");
   }
 
+  // Resolve Supabase config for client (runtime support)
+  const supabaseUrl = env.PUBLIC_SUPABASE_URL || env.SUPABASE_URL;
+  const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY;
+
   // Retornar los datos al cliente
   return {
     system: systemParam,
     brandConfig: brandConfig as BrandConfig,
-    // session and user are enough for the layout
+    // Pass runtime config to client
+    supabaseUrl,
+    supabaseAnonKey,
     session,
     user,
     cookies: cookies.getAll(),

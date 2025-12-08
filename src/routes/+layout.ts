@@ -7,7 +7,11 @@ export const load: LayoutLoad = async ({ fetch, data, depends }) => {
 
   let supabase;
   if (isBrowser()) {
-    supabase = createSupabaseBrowserClient(fetch);
+    supabase = createSupabaseBrowserClient({
+      fetch,
+      url: (data as any).supabaseUrl,
+      key: (data as any).supabaseAnonKey,
+    });
     console.log("✅ Supabase Client Initialized");
   }
 

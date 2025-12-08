@@ -4,18 +4,25 @@ import {
   PUBLIC_SUPABASE_ANON_KEY,
 } from "$env/static/public";
 
-export function createSupabaseBrowserClient(fetch?: typeof globalThis.fetch) {
-  if (!PUBLIC_SUPABASE_URL || !PUBLIC_SUPABASE_ANON_KEY) {
+export function createSupabaseBrowserClient({
+  fetch,
+  url,
+  key,
+}: {
+  fetch?: typeof globalThis.fetch;
+  url?: string;
+  key?: string;
+}) {
+  const supabaseUrl = url || PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = key || PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
     console.error(
       "❌ Missing PUBLIC_SUPABASE_URL or PUBLIC_SUPABASE_ANON_KEY in browser env"
     );
-    // Return a dummy client or throw? Throwing is safer to catch config errors early.
-    // However, to avoid crashing the whole app if just one page needs it, we could warn.
-    // But the user said "Falta... Error... Quiero que funcione al 100%".
-    // Throwing is correct if it's required.
   }
 
-  return createBrowserClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+  return createBrowserClient(supabaseUrl!, supabaseAnonKey!, {
     auth: {
       detectSessionInUrl: false, // We handle this manually or via callback
       persistSession: true,
