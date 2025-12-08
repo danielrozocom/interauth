@@ -53,10 +53,15 @@ export const load: PageServerLoad = async ({ url, locals }) => {
         console.log(`[Auth] User authenticated: ${user.email}`);
 
         // Resolver la redirección
+        const redirectTo =
+          url.searchParams.get("redirectTo") ||
+          url.searchParams.get("redirect_to");
         const brandConfig = resolveBrand(system || "auth");
         let target = "/";
 
-        if (brandConfig && brandConfig.redirectUrlAfterLogin) {
+        if (redirectTo && redirectTo.startsWith("http")) {
+          target = redirectTo;
+        } else if (brandConfig && brandConfig.redirectUrlAfterLogin) {
           target = brandConfig.redirectUrlAfterLogin;
         } else {
           // Fallback a InterPOS por defecto si no hay system

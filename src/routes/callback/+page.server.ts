@@ -5,7 +5,9 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
   const next = url.searchParams.get("next");
   const system = url.searchParams.get("system");
   const type = url.searchParams.get("type"); // recovery, signup, etc.
-  const redirectTo = url.searchParams.get("redirectTo"); // Nueva: URL externa para redirigir
+  // Support both camelCase and snake_case for redirect URL
+  const redirectTo =
+    url.searchParams.get("redirectTo") || url.searchParams.get("redirect_to");
 
   // Estado inicial de la respuesta
   const result = {
@@ -50,14 +52,8 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 
     // Lógica de destino actualizada
     if (redirectTo && redirectTo.startsWith("http")) {
-      // Validar que sea una URL externa permitida (ej. dominios conocidos)
-      const allowedDomains = ["tu-pos.com", "interfundeoms.edu.co"]; // Agrega tus dominios permitidos
-      const urlObj = new URL(redirectTo);
-      if (allowedDomains.some((domain) => urlObj.hostname.includes(domain))) {
-        result.redirectUrl = redirectTo; // Redirige a la URL externa
-      } else {
-        result.redirectUrl = "/"; // Fallback si no permitida
-      }
+      // Redirigir exactamente a la URL solicitada
+      result.redirectUrl = redirectTo;
     } else if (next && next.startsWith("/")) {
       result.redirectUrl = next; // Ruta interna
     } else if (system === "pos") {

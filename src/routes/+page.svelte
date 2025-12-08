@@ -250,7 +250,17 @@
       });
       if (error) throw error;
       // Redirigir
-      const target = data?.brandConfig?.redirectUrlAfterLogin || "/";
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTo =
+        urlParams.get("redirectTo") || urlParams.get("redirect_to");
+
+      let target = "/";
+      if (redirectTo && redirectTo.startsWith("http")) {
+        target = redirectTo;
+      } else if (data?.brandConfig?.redirectUrlAfterLogin) {
+        target = data.brandConfig.redirectUrlAfterLogin;
+      }
+
       window.location.replace(target);
     } catch (err: any) {
       infoMessage = "Credenciales inválidas";
@@ -263,13 +273,25 @@
   async function loginWithGoogle() {
     isGoogleSubmitting = true;
     try {
-      const redirectTo = data?.system
-        ? `${window.location.origin}/?system=${data.system}`
-        : `${window.location.origin}/`;
+      const urlParams = new URLSearchParams(window.location.search);
+      const finalRedirectTo =
+        urlParams.get("redirectTo") || urlParams.get("redirect_to");
+
+      let callbackUrl = window.location.origin;
+      if (data?.system) {
+        callbackUrl += `/?system=${data.system}`;
+      } else {
+        callbackUrl += "/";
+      }
+
+      if (finalRedirectTo) {
+        const separator = callbackUrl.includes("?") ? "&" : "?";
+        callbackUrl += `${separator}redirectTo=${encodeURIComponent(finalRedirectTo)}`;
+      }
 
       const { data: res } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo },
+        options: { redirectTo: callbackUrl },
       });
       if (res?.url) window.location.href = res.url;
     } catch (err) {
