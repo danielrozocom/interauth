@@ -1,5 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import { DEFAULT_REDIRECT_URL } from "$lib/brandConfig";
+import { DEFAULT_REDIRECT_URL, resolveBrand } from "$lib/brandConfig";
 
 export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
   const code = url.searchParams.get("code");
@@ -55,16 +55,15 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
     if (redirectTo) {
       // Redirigir exactamente a la URL solicitada
       result.redirectUrl = redirectTo;
-    } else if (next && next.startsWith("/")) {
-      result.redirectUrl = next; // Ruta interna
-    } else if (system === "pos") {
-      result.redirectUrl = process.env.POS_URL || "/"; // Externa conocida
-    } else if (system === "app") {
-      result.redirectUrl = process.env.APP_URL || "/"; // Externa conocida
     } else if (type === "recovery") {
       result.redirectUrl = "/?type=recovery&code_valid=true";
     } else {
-      result.redirectUrl = DEFAULT_REDIRECT_URL;
+      const brandConfig = resolveBrand(system);
+      if (brandConfig && brandConfig.redirectUrlAfterLogin) {
+        result.redirectUrl = brandConfig.redirectUrlAfterLogin;
+      } else {
+        result.redirectUrl = DEFAULT_REDIRECT_URL;
+      }
     }
   } catch (err: any) {
     console.error("Excepción en callback:", err);
