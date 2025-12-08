@@ -1,221 +1,201 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import PasswordInput from "$lib/components/PasswordInput.svelte";
+  import { onMount, onDestroy } from "svelte";
 
   export let data: PageData;
 
-  let loadingEmail = false;
-  let loadingOAuth = false;
-  let loadingReset = false;
+  // Estados del flujo
+  type Step = "login" | "email" | "otp" | "new_password" | "success";
+  let currentStep: Step = "login";
 
-  $: isLoading = loadingEmail || loadingOAuth || loadingReset;
+  let loading = false;
   let email = "";
   let password = "";
-  let forgotMode = false;
+  let confirmPassword = "";
+  let otpCode = "";
   let infoMessage: string | null = null;
-  let resetPasswordMode = false;
+  let isError = false;
 
-  // Reactividad para detectar modo de recuperación o invitación
+  // Cooldown logic
+  let cooldownSeconds = 0;
+  let timer: any;
+
+  function startCooldown() {
+    cooldownSeconds = 60;
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+      cooldownSeconds--;
+      if (cooldownSeconds <= 0) {
+        clearInterval(timer);
+        cooldownSeconds = 0;
+      }
+    }, 1000);
+  }
+
+  onDestroy(() => {
+    if (timer) clearInterval(timer);
+  });
+
+  // Inicializar estado basado en datos del servidor (si vienes de un link mágico legacy)
   $: {
     const authInfo = (data as any).authInfo;
-
-    // Si hay un info de auth, procesarlo
-    if (authInfo) {
-      // Caso 1: Código Válido + (Recovery o Invite) -> Modo Reset Password
-      if (
-        authInfo.valid &&
-        (authInfo.event === "recovery" || authInfo.event === "invite") &&
-        data.session
-      ) {
-        resetPasswordMode = true;
-        if (!infoMessage) infoMessage = authInfo.message;
-      }
-
-      // Caso 2: Código Válido + Login/Signup -> Autenticación exitosa
-      // Si el usuario ya tiene sesión y NO estamos en modo recuperación, redirigir al App/Target
-      else if (authInfo.valid && data.session && !resetPasswordMode) {
-        // Usuario logueado correctamente. Proceder al target.
-        // Usamos timeout para dar feedback visual breve si se desea, o inmediato.
-        const target = data?.brandConfig?.redirectUrlAfterLogin || "/";
-        // Usamos location.replace para navegar al destino final (app/dashboard)
-        // Esto cumple "Solo redirects controlados... después de login exitoso"
-        if (typeof window !== "undefined") {
-          window.location.replace(target);
-        }
-      }
-
-      // Caso 3: Código Inválido
-      else if (!authInfo.valid && authInfo.message) {
+    if (
+      authInfo?.valid &&
+      (authInfo.event === "recovery" || authInfo.event === "invite") &&
+      data.session &&
+      currentStep === "login"
+    ) {
+      currentStep = "new_password";
+      if (!infoMessage) {
         infoMessage = authInfo.message;
+        isError = false;
       }
     }
-
-    // Mostrar error del servidor si existe (data.error legacy)
-    if ((data as any).error) infoMessage = (data as any).error;
-  }
-
-  // Función para validar formato de email
-  function isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email.trim());
-  }
-
-  // Determinar el sistema desde la URL (ej: ?system=pos)
-  $: systemParam = (() => {
-    try {
-      if (typeof window !== "undefined") {
-        return (
-          new URLSearchParams(window.location.search).get("system") || "pos"
-        );
-      }
-      return "pos";
-    } catch {
-      return "pos";
-    }
-  })();
-
-  // Construir la URL de callback según el sistema
-  $: callbackUrl = (() => {
-    const isDev = import.meta.env.DEV;
-    const system = systemParam.toLowerCase();
-
-    let url;
-    // Mapear sistema a variable de entorno
-    if (system === "pos" || system === "interpos") {
-      url = isDev
-        ? import.meta.env.PUBLIC_POS_CALLBACK_URL_DEV ||
-          import.meta.env.PUBLIC_POS_CALLBACK_URL
-        : import.meta.env.PUBLIC_POS_CALLBACK_URL;
-    } else if (system === "app" || system === "interapp") {
-      url = isDev
-        ? import.meta.env.PUBLIC_APP_CALLBACK_URL_DEV ||
-          import.meta.env.PUBLIC_APP_CALLBACK_URL
-        : import.meta.env.PUBLIC_APP_CALLBACK_URL;
-    } else {
-      // Fallback: usar la configuración del brandConfig si existe
-      url =
-        data?.brandConfig?.redirectUrlAfterLogin ||
-        import.meta.env.PUBLIC_POS_CALLBACK_URL;
-    }
-
-    return url;
-  })();
-
-  async function loginWithGoogle() {
-    loadingOAuth = true;
-
-    try {
-      const { data: res, error } = await (
-        data as any
-      ).supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: callbackUrl,
-        },
-      });
-      if (res && (res as any).url) {
-        window.location.href = (res as any).url;
-        return;
-      }
-
-      const target = data?.brandConfig?.redirectUrlAfterLogin || "/";
-      window.location.replace(target);
-    } catch (err: any) {
-      console.error("Error iniciando sesión con Google:", err);
-      infoMessage = err.message || String(err);
-      loadingOAuth = false;
+    // Errores legacy
+    if ((data as any).error) {
+      infoMessage = (data as any).error;
+      isError = true;
     }
   }
 
-  async function loginWithEmail() {
-    loadingEmail = true;
+  function validateEmail(e: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+  }
+
+  // Paso 1: Enviar OTP
+  async function sendOtpCode() {
+    loading = true;
     infoMessage = null;
+    isError = false;
 
-    // Validar formato de email
-    if (!isValidEmail(email)) {
-      infoMessage = "Ingresa un email válido";
-      loadingEmail = false;
+    if (!validateEmail(email)) {
+      infoMessage = "Ingresa un email válido.";
+      isError = true;
+      loading = false;
+      return;
+    }
+
+    if (cooldownSeconds > 0) {
       return;
     }
 
     try {
-      const { data: res, error } = await (
+      const { error } = await (data as any).supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          shouldCreateUser: false, // Solo recuperación, no registro
+        },
+      });
+
+      if (error) throw error;
+
+      // Éxito: Pasar al paso 2
+      currentStep = "otp";
+      infoMessage =
+        "Te enviamos un código a tu correo. Escríbelo para continuar.";
+      isError = false;
+      startCooldown();
+    } catch (err: any) {
+      console.error("Error enviando OTP:", err);
+      if (err.message && err.message.includes("Signups not allowed for otp")) {
+        infoMessage = "Correo no encontrado";
+      } else {
+        infoMessage =
+          err.message || "No pudimos enviar el código. Intenta de nuevo.";
+      }
+      isError = true;
+    } finally {
+      loading = false;
+    }
+  }
+
+  // Paso 2: Verificar OTP
+  async function verifyOtpCode() {
+    loading = true;
+    infoMessage = null;
+    isError = false;
+
+    if (!otpCode || otpCode.length < 6) {
+      infoMessage = "El código debe tener 6 dígitos.";
+      isError = true;
+      loading = false;
+      return;
+    }
+
+    try {
+      const { data: sessionData, error } = await (
+        data as any
+      ).supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: otpCode.trim(),
+        type: "email",
+      });
+
+      if (error) throw error;
+
+      // Éxito: Pasar al paso 3 (Cambio de contraseña)
+      currentStep = "new_password";
+      password = ""; // Clear potential stale password
+      confirmPassword = "";
+      infoMessage = null;
+      isError = false;
+    } catch (err: any) {
+      console.error("Error verificando OTP:", err);
+      infoMessage = "El código no es válido o ya expiró. Pide uno nuevo.";
+      isError = true;
+    } finally {
+      loading = false;
+    }
+  }
+
+  // Paso 3: Cambiar Contraseña Final
+  async function updatePasswordFinal() {
+    loading = true;
+    infoMessage = null;
+    isError = false;
+
+    if (!password || password.length < 6) {
+      infoMessage = "La contraseña debe tener al menos 6 caracteres.";
+      isError = true;
+      loading = false;
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      infoMessage = "Las contraseñas no coinciden.";
+      isError = true;
+      loading = false;
+      return;
+    }
+
+    // Comprobación de que la contraseña no sea la actual (Probe)
+    try {
+      const { data: probeData, error: probeError } = await (
         data as any
       ).supabase.auth.signInWithPassword({
         email: email.trim(),
-        password,
+        password: password,
       });
 
-      if (error) throw error;
+      if (probeData?.session) {
+        // Login exitoso: significa que la clave es IGUAL a la actual.
+        // Bloquear actualización.
+        infoMessage = "La nueva contraseña no puede ser igual a la actual.";
+        isError = true;
+        // NO hacer signOut aquí, porque mata la sesión obtenida por OTP
+        // y el usuario no podrá intentar con otra contraseña sin volver a empezar.
 
-      // Si la sesión fue creada, redirigir al target configurado
-      const target = data?.brandConfig?.redirectUrlAfterLogin || "/";
-      window.location.replace(target);
-    } catch (err: any) {
-      console.error("Error iniciando sesión por correo:", err);
-      // Mapear errores comunes a un mensaje más amigable
-      const em = err || {};
-      let messageText: string;
-
-      // Verificar código de error específico
-      if (em?.code === "user_banned") {
-        messageText = "Usuario suspendido";
-      } else if (
-        em?.status === 400 ||
-        /invalid|incorrect|credentials|no user/i.test(em?.message || "")
-      ) {
-        messageText = "Credenciales inválidas";
-      } else {
-        messageText = em?.message || String(em);
+        loading = false;
+        return;
       }
 
-      infoMessage = messageText;
-      loadingEmail = false;
+      // Si recibimos un error, asumiendo que es "Invalid login credentials",
+      // significa que la contraseña es diferente => Proceder.
+      // (Podrían ser otros errores, pero en este contexto si falla el login, asumimos es seguro intentar el update).
+    } catch (probeErr) {
+      // Ignorar error de probe, continuamos al update
     }
-  }
-
-  async function sendPasswordReset() {
-    loadingReset = true;
-    infoMessage = null;
-
-    // Validar formato de email
-    if (!isValidEmail(email)) {
-      infoMessage = "Ingresa un email válido";
-      loadingReset = false;
-      return;
-    }
-
-    try {
-      const { data: res, error } = await (
-        data as any
-      ).supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: callbackUrl,
-      });
-
-      if (error) throw error;
-
-      infoMessage =
-        "Se ha enviado un correo con instrucciones. Revisa tu bandeja.";
-      loadingReset = false;
-    } catch (err: any) {
-      console.error("Error enviando correo de recuperación:", err);
-      if (
-        err.message &&
-        err.message.includes(
-          "For security purposes, you can only request this after 4 seconds."
-        )
-      ) {
-        infoMessage =
-          "Por motivos de seguridad, solo puedes solicitar esto después de 4 segundos.";
-      } else {
-        infoMessage = err.message || String(err);
-      }
-    }
-  }
-
-  async function updatePassword() {
-    loadingReset = true;
-    infoMessage = null;
 
     try {
       const { error } = await (data as any).supabase.auth.updateUser({
@@ -224,37 +204,139 @@
 
       if (error) throw error;
 
-      infoMessage = "¡Contraseña actualizada! Iniciando sesión...";
-      setTimeout(() => {
-        // Redirigir al dashboard o donde corresponda
-        const target = data?.brandConfig?.redirectUrlAfterLogin || "/";
-        window.location.replace(target);
-      }, 1500);
+      // Cerrar sesión para seguridad
+      await (data as any).supabase.auth.signOut();
+
+      // Éxito Final
+      currentStep = "success";
+      infoMessage = null;
+      isError = false;
     } catch (err: any) {
-      console.error("Error actualizando contraseña:", err);
-      infoMessage = err.message || "No pudimos actualizar la contraseña.";
-      loadingReset = false;
+      console.error("Error actualizando password:", err);
+      // Validar si el error viene de que la contraseña es igual (algunos backends lo dicen)
+      // pero ya lo cubrimos con el probe.
+      if (
+        err.message &&
+        err.message.toLowerCase().includes("same as current")
+      ) {
+        infoMessage = "La nueva contraseña no puede ser igual a la actual.";
+      } else {
+        infoMessage = "No se pudo actualizar la contraseña. Intenta de nuevo.";
+      }
+      isError = true;
+    } finally {
+      loading = false;
     }
+  }
+
+  // Login Normal (Legacy)
+  async function loginWithEmail() {
+    loading = true;
+    infoMessage = null;
+    isError = false;
+
+    try {
+      const { error } = await (data as any).supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) throw error;
+      // Redirigir
+      const target = data?.brandConfig?.redirectUrlAfterLogin || "/";
+      window.location.replace(target);
+    } catch (err: any) {
+      infoMessage = "Credenciales inválidas";
+      isError = true;
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function loginWithGoogle() {
+    loading = true; // Use global loading state
+    try {
+      const { data: res, error } = await (
+        data as any
+      ).supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: data?.brandConfig?.redirectUrlAfterLogin || "/",
+        },
+      });
+      if (res?.url) window.location.href = res.url;
+    } catch (err) {
+      console.error(err);
+      loading = false;
+    }
+  }
+
+  function resetFlow() {
+    currentStep = "login";
+    // email = ""; // Mantener email para UX
+    password = "";
+    confirmPassword = "";
+    otpCode = "";
+    infoMessage = null;
+    isError = false;
   }
 </script>
 
 <svelte:head>
-  <title>Login | {data?.brandConfig?.name || "InterAuth"}</title>
+  <title
+    >{currentStep === "login" ? "Login" : "Recuperación de cuenta"} | {(
+      data as any
+    )?.brandConfig?.name || "InterAuth"}</title
+  >
 </svelte:head>
 
 <div class="login-page">
   <div class="card">
     <div class="brand">
-      <h1>{data?.brandConfig?.name || "InterAuth"}</h1>
+      <h1>{(data as any)?.brandConfig?.name || "InterAuth"}</h1>
     </div>
     <div class="card-body">
-      <h2>Login</h2>
+      <!-- Header Dinámico -->
+      {#if currentStep === "login"}
+        <h2>Login</h2>
+      {:else if currentStep === "email"}
+        <h2>Recuperar Cuenta</h2>
+        <p>Ingresa tu correo para recibir un código de acceso.</p>
+      {:else if currentStep === "otp"}
+        <h2>Verificar Código</h2>
+        <p>Ingresa el código enviado a <strong>{email}</strong></p>
+      {:else if currentStep === "new_password"}
+        <h2>Nueva Contraseña</h2>
+        <p>Ingresa tu nueva contraseña.</p>
+      {:else if currentStep === "success"}
+        <div class="success-icon">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            stroke="currentColor"
+            width="48"
+            height="48"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </div>
+        <h2>¡Listo!</h2>
+      {/if}
+
       <img
         src="/favicon.svg"
-        alt="{data?.brandConfig?.name} logo"
+        alt="Logo"
         class="top-logo"
+        style:display={currentStep === "success" ? "none" : "block"}
       />
-      {#if !forgotMode}
+
+      <!-- VISTA: LOGIN -->
+      {#if currentStep === "login"}
         <div class="form-group">
           <input
             type="email"
@@ -263,164 +345,219 @@
             class="input"
             aria-label="Correo electrónico"
           />
-
           <PasswordInput
-            id="password"
-            name="password"
             bind:value={password}
             placeholder="Contraseña"
-            disabled={isLoading}
+            disabled={loading}
           />
 
           <button
             on:click={loginWithEmail}
             class="login-btn mb-2"
-            disabled={isLoading || !email || !password || !isValidEmail(email)}
-            aria-busy={loadingEmail}
+            disabled={loading || !password || !validateEmail(email)}
           >
-            {#if loadingEmail}
-              <span class="spinner" aria-hidden="true"></span>
-              <span>Iniciando…</span>
+            {#if loading}
+              <span class="spinner"></span>
             {:else}
               <span>Iniciar sesión con correo</span>
             {/if}
           </button>
           {#if infoMessage}
-            <div class="error-message" role="alert" aria-live="assertive">
+            <div
+              class={isError ? "error-message" : "info-message"}
+              role="alert"
+            >
               {infoMessage}
             </div>
           {/if}
 
           <button
-            type="button"
             class="link-btn"
             on:click={() => {
-              forgotMode = true;
+              currentStep = "email";
+              password = ""; // Clear password to prevent pre-fill
               infoMessage = null;
             }}
           >
             Olvidé mi contraseña
           </button>
         </div>
-      {:else if resetPasswordMode}
-        <div class="form-group">
-          <p>
-            Hola, <strong>{data.session?.user?.email}</strong>. Define tu nueva
-            contraseña.
-          </p>
 
-          <PasswordInput
-            id="new-password"
-            name="new-password"
-            bind:value={password}
-            placeholder="Nueva contraseña"
-            disabled={isLoading}
-          />
+        <div class="separator-hr"></div>
 
-          <button
-            on:click={updatePassword}
-            class="login-btn mb-2"
-            disabled={isLoading || !password || password.length < 6}
-            aria-busy={loadingReset}
-          >
-            {#if loadingReset}
-              <span class="spinner" aria-hidden="true"></span>
-              <span>Guardando...</span>
-            {:else}
-              <span>Actualizar contraseña</span>
-            {/if}
-          </button>
-        </div>
-      {:else}
+        <button
+          on:click={loginWithGoogle}
+          class="login-btn mb-3 mobile-google-btn"
+          disabled={loading}
+          aria-label="Iniciar sesión con Google"
+        >
+          {#if loading}
+            <span class="spinner" aria-hidden="true"></span>
+            <span>Redirigiendo…</span>
+          {:else}
+            <span class="g-mark" aria-hidden="true">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 18 18"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  fill="#4285F4"
+                  d="M17.64 9.2c0-.63-.06-1.23-.17-1.81H9v3.42h4.84c-.21 1.16-.84 2.15-1.8 2.82v2.34h2.91c1.7-1.57 2.69-3.86 2.69-6.77z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M9 18c2.43 0 4.47-.8 5.96-2.17l-2.91-2.34c-.8.54-1.82.86-3.05.86-2.35 0-4.34-1.58-5.05-3.72H1.02v2.33C2.5 15.78 5.53 18 9 18z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M3.95 10.63A5.41 5.41 0 0 1 3.6 9c0-.64.11-1.26.31-1.83V4.84H1.02A9 9 0 0 0 0 9c0 1.45.35 2.82.97 4.01l2.98-2.38z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M9 3.56c1.32 0 2.5.45 3.43 1.34l2.57-2.57C13.44.99 11.4 0 9 0 5.53 0 2.5 2.22 1.02 4.84l2.98 2.33C4.66 5.14 6.65 3.56 9 3.56z"
+                />
+              </svg>
+            </span>
+            <span>Iniciar sesión con Google</span>
+          {/if}
+        </button>
+
+        <p class="help-text mt-4">
+          Si necesitas ayuda contacta al administrador.
+        </p>
+
+        <!-- VISTA: PASO 1 (EMAIL) -->
+      {:else if currentStep === "email"}
         <div class="form-group">
-          <p>
-            Introduce tu correo y te enviaremos un enlace para restablecer la
-            contraseña.
-          </p>
           <input
             type="email"
             placeholder="Correo electrónico"
             bind:value={email}
             class="input"
-            aria-label="Correo electrónico"
           />
-
           <button
-            on:click={sendPasswordReset}
+            on:click={sendOtpCode}
             class="login-btn mb-2"
-            disabled={isLoading || !email || !isValidEmail(email)}
-            aria-busy={loadingReset}
+            disabled={loading || !validateEmail(email) || cooldownSeconds > 0}
           >
-            {#if loadingReset}
-              <span class="spinner" aria-hidden="true"></span>
-              <span>Enviando…</span>
+            {#if loading}
+              <span class="spinner"></span>
+            {:else if cooldownSeconds > 0}
+              Espera {cooldownSeconds}s
             {:else}
-              <span>Enviar enlace de recuperación</span>
+              Enviar código
             {/if}
           </button>
 
+          {#if infoMessage}
+            <div class={isError ? "error-message" : "info-message"}>
+              {infoMessage}
+            </div>
+          {/if}
+
+          <button class="link-btn" on:click={resetFlow}>Volver al login</button>
+        </div>
+
+        <!-- VISTA: PASO 2 (OTP) -->
+      {:else if currentStep === "otp"}
+        <div class="form-group">
+          <input
+            type="tel"
+            placeholder="Código de 6 dígitos"
+            value={otpCode}
+            on:input={(e) =>
+              (otpCode = e.currentTarget.value.replace(/\D/g, ""))}
+            class="input otp-input"
+            maxlength="6"
+          />
           <button
-            type="button"
-            class="link-btn"
-            on:click={() => {
-              forgotMode = false;
-              infoMessage = null;
-            }}
+            on:click={verifyOtpCode}
+            class="login-btn mb-2"
+            disabled={loading || otpCode.length < 6}
           >
-            Volver al inicio de sesión
+            {#if loading}
+              <span class="spinner"></span>
+            {:else}
+              Verificar código
+            {/if}
+          </button>
+
+          {#if infoMessage}
+            <div class={isError ? "error-message" : "info-message"}>
+              {infoMessage}
+            </div>
+          {/if}
+
+          <button
+            class="link-btn"
+            disabled={loading || cooldownSeconds > 0}
+            style:opacity={cooldownSeconds > 0 ? "0.5" : "1"}
+            style:cursor={cooldownSeconds > 0 ? "not-allowed" : "pointer"}
+            on:click={sendOtpCode}
+          >
+            {#if cooldownSeconds > 0}
+              Reenviar en {cooldownSeconds}s
+            {:else}
+              Reenviar código
+            {/if}
           </button>
         </div>
-      {/if}
 
-      {#if infoMessage && forgotMode}
-        <div class="info-message">{infoMessage}</div>
-      {/if}
-      <div class="separator-hr" aria-hidden="true"></div>
+        <!-- VISTA: PASO 3 (NUEVA CLAVE) -->
+      {:else if currentStep === "new_password"}
+        <div class="form-group">
+          <PasswordInput
+            bind:value={password}
+            placeholder="Nueva contraseña"
+            disabled={loading}
+          />
+          <PasswordInput
+            bind:value={confirmPassword}
+            placeholder="Confirmar contraseña"
+            disabled={loading}
+          />
+          <button
+            on:click={updatePasswordFinal}
+            class="login-btn mb-2"
+            disabled={loading ||
+              password.length < 6 ||
+              password !== confirmPassword}
+          >
+            {#if loading}
+              <span class="spinner"></span>
+            {:else}
+              Cambiar contraseña
+            {/if}
+          </button>
 
-      <button
-        on:click={loginWithGoogle}
-        class="login-btn mb-3"
-        disabled={isLoading}
-        aria-busy={loadingOAuth}
-        aria-label="Iniciar sesión con Google"
-      >
-        {#if loadingOAuth}
-          <span class="spinner" aria-hidden="true"></span>
-          <span>Redirigiendo…</span>
-        {:else}
-          <span class="g-mark" aria-hidden="true">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 18 18"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-              focusable="false"
-            >
-              <path
-                fill="#4285F4"
-                d="M17.64 9.2c0-.63-.06-1.23-.17-1.81H9v3.42h4.84c-.21 1.16-.84 2.15-1.8 2.82v2.34h2.91c1.7-1.57 2.69-3.86 2.69-6.77z"
-              />
-              <path
-                fill="#34A853"
-                d="M9 18c2.43 0 4.47-.8 5.96-2.17l-2.91-2.34c-.8.54-1.82.86-3.05.86-2.35 0-4.34-1.58-5.05-3.72H1.02v2.33C2.5 15.78 5.53 18 9 18z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M3.95 10.63A5.41 5.41 0 0 1 3.6 9c0-.64.11-1.26.31-1.83V4.84H1.02A9 9 0 0 0 0 9c0 1.45.35 2.82.97 4.01l2.98-2.38z"
-              />
-              <path
-                fill="#EA4335"
-                d="M9 3.56c1.32 0 2.5.45 3.43 1.34l2.57-2.57C13.44.99 11.4 0 9 0 5.53 0 2.5 2.22 1.02 4.84l2.98 2.33C4.66 5.14 6.65 3.56 9 3.56z"
-              />
-            </svg>
-          </span>
-          <span>Iniciar sesión con Google</span>
-        {/if}
-      </button>
-      <p class="help-text mt-4">
-        Si necesitas ayuda contacta al administrador.
-      </p>
+          {#if infoMessage}
+            <div class={isError ? "error-message" : "info-message"}>
+              {infoMessage}
+            </div>
+          {/if}
+        </div>
+
+        <!-- VISTA: ÉXITO -->
+      {:else if currentStep === "success"}
+        <div class="form-group">
+          <p>
+            Tu contraseña se actualizó correctamente.<br />Ahora puedes iniciar
+            sesión normalmente.
+          </p>
+
+          {#if infoMessage}
+            <div class={isError ? "error-message" : "info-message"}>
+              {infoMessage}
+            </div>
+          {/if}
+
+          <button on:click={resetFlow} class="login-btn">Ir al Login</button>
+        </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -436,7 +573,6 @@
     min-height: calc(100vh - var(--topbar-h, 64px));
     align-items: center;
     justify-content: center;
-    /* Let the browser handle scrolling to avoid nested scrollbars */
     overflow: visible;
     padding: 2rem 0;
   }
@@ -446,17 +582,14 @@
     border-radius: 16px;
     border: 1px solid rgba(2, 6, 23, 0.06);
     box-shadow: 0 12px 30px rgba(2, 6, 23, 0.06);
-    /* Compact card for better desktop density */
     width: 360px;
     max-width: min(420px, 92%);
-    /* Keep rounded corners and avoid inner overflow (content may extend page) */
     overflow: hidden;
     max-height: none;
     position: relative;
     margin: 2rem auto;
   }
 
-  /* When the card height exceeds the viewport, keep a comfortable top margin */
   @media (max-height: 700px) {
     .login-page {
       align-items: flex-start;
@@ -468,14 +601,11 @@
       margin-bottom: 1.5rem;
     }
   }
-  /* Desktop polish */
   @media (min-width: 1000px) {
-    /* Slightly larger on wide screens but still compact */
     .card {
       width: 560px;
       border-radius: 16px;
       box-shadow: 0 14px 34px rgba(2, 6, 23, 0.05);
-      /* Allow enough height on desktop to avoid internal scroll */
       max-height: none;
     }
     .card-body {
@@ -487,11 +617,10 @@
     }
   }
   .brand {
-    background: var(--primary);
+    background: var(--primary-color);
     color: #fff;
     padding: 0.9rem 1rem;
     text-align: center;
-    /* Round only the top corners so background matches the parent card */
     border-top-left-radius: 16px;
     border-top-right-radius: 16px;
   }
@@ -503,7 +632,6 @@
   }
   .card-body {
     padding: 1rem 1.25rem;
-    /* Allow the page to scroll instead of the card */
     overflow: visible;
     max-height: none;
   }
@@ -528,7 +656,6 @@
   }
   @media (max-height: 700px), (max-width: 420px) {
     .card {
-      /* Allow the card to grow and let the page scroll instead of clipping */
       overflow: visible;
       margin: 0 12px;
       width: calc(100% - 24px);
@@ -546,7 +673,7 @@
   .login-btn {
     width: 100%;
     padding: 0.65rem 0.8rem;
-    background: var(--primary);
+    background: var(--primary-color);
     color: #ffffff;
     font-weight: 700;
     border: none;
@@ -627,54 +754,15 @@
       box-shadow 150ms ease,
       background 150ms ease;
   }
-  /* Focus styles for inputs */
   .input:focus {
     outline: none;
     border-color: #35528c;
     box-shadow: 0 6px 18px rgba(53, 82, 140, 0.06);
   }
-  .password-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-  .password-input {
-    padding-right: 48px;
-    box-sizing: border-box;
-    height: 40px;
-    padding-top: 0.4rem;
-    padding-bottom: 0.4rem;
-  }
-  .toggle-password {
-    position: absolute;
-    right: 4px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: transparent;
-    border: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    cursor: pointer;
-    color: var(--primary-color);
-    border-radius: 8px;
-    box-shadow: none;
-    padding: 4px;
-    transition:
-      background 150ms ease,
-      box-shadow 150ms ease,
-      color 150ms ease;
-    z-index: 5;
-  }
-  .toggle-password:hover {
-    color: #4a5fa1;
-  }
-  .toggle-password:focus {
-    outline: none;
-    box-shadow: 0 0 0 4px rgba(53, 82, 140, 0.06);
-    border-radius: 8px;
+  .otp-input {
+    letter-spacing: 4px;
+    font-size: 1.2rem;
+    text-align: center;
   }
   .form-group {
     display: flex;
@@ -709,5 +797,32 @@
     border-radius: 8px;
     font-weight: 700;
     text-align: center;
+  }
+  .success-icon {
+    display: flex;
+    justify-content: center;
+    color: #10b981;
+    margin-bottom: 1rem;
+  }
+  /* Google Button Specifics (Simplified mixin style) */
+  .mobile-google-btn {
+    /* Inherits mostly from login-btn but ensure we match the white/text style if originally different? 
+         Original button has .login-btn mb-3 (plus SVG inside). Not a separate class. 
+         But typically Google button is white. I check logic:
+         Original code used .login-btn for google too?
+         Wait, checking previous file... 
+         lines 292-294: class="login-btn mb-3" ... 
+         Looking at the button inner HTML: it has span.g-mark... and text "Iniciar sesión con Google".
+         Wait, CSS for .login-btn sets background to var(--primary). 
+         Does original google button look blue? 
+         Actually, there is no special class in original for google button except "login-btn mb-3".
+         However, the SVG paths have colors (#4285F4, etc).
+         If the button background is blue, the colorful G might look weird or the button is white?
+         Let's re-read the original CSS carefully.
+         .login-btn background is var(--primary).
+         So yes, the Google button was likely Blue with a white circle (g-mark) containing the colored G.
+         My new code preserves that structure: <span class="g-mark">...SVG...</span>.
+         So I just need to make sure I use class="login-btn mb-3" and NOT add "google-btn" styles that might conflict or be missing.
+      */
   }
 </style>
