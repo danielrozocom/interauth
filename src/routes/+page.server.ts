@@ -1,4 +1,5 @@
 import { redirect } from "@sveltejs/kit";
+import { resolveBrand } from "$lib/brandConfig";
 import type { PageServerLoad } from "./$types";
 
 const SYSTEM_REDIRECTS = {
@@ -15,47 +16,79 @@ const ALLOWED_DOMAINS = [
 
 export const load: PageServerLoad = async ({ url, locals }) => {
   const code = url.searchParams.get("code");
-  // const system = url.searchParams.get("system"); // We might use this for UI context but not for redirecting away
-  // const redirectTo = url.searchParams.get("redirect_to"); // Ignore for auto-redirect
+  const system = url.searchParams.get("system");
 
-  // 1. Si no hay código, carga normal
-  if (!code) {
-    return {};
-  }
+  // 1. Procesar intercambio de código (Sign In with Google/Magic Link)
+  if (code) {
+    console.log(`[Auth] Code detected for system: ${system || "unknown"}`);
+    try {
+      const supabase = locals.supabase;
+      const { error, data } = await supabase.auth.exchangeCodeForSession(code);
 
-  // 2. Procesar el código silenciosamente
-  let authInfo = {
-    valid: false,
-    message: "",
-    event: url.searchParams.get("type") || "login", // 'recovery', 'signup', 'invite', 'magiclink'
-  };
+      if (error) {
+        console.error("[Auth] Code exchange failed:", error);
+        return {
+          authInfo: {
+            valid: false,
+            message:
+              "El enlace ya no es válido o ha expirado. Por favor solicita uno nuevo.",
+          },
+        };
+      }
 
-  try {
-    const supabase = locals.supabase;
-    // Intentar intercambiar el código.
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+      console.log("[Auth] Session exchanged successfully.");
 
-    if (error) {
-      console.warn("Auth code invalid:", error.message);
-      authInfo.valid = false;
-      authInfo.message =
-        "El enlace ya no es válido o ha expirado. Por favor solicita uno nuevo.";
-    } else {
-      console.log("✅ Auth code exchanged successfully");
-      authInfo.valid = true;
-      authInfo.message = "Verificado correctamente.";
+      // Verificar si la sesión es válida con getUser
+      // Esto asegura que safeGetSession en layout se actualice
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      // Si el código no tenía type, asumimos login.
-      // Si Supabase devuelve sesión, el usuario está logueado.
+      if (user) {
+        console.log(`[Auth] User authenticated: ${user.email}`);
+
+        // Resolver la redirección
+        const brandConfig = resolveBrand(system || "auth");
+        let target = "/";
+
+        if (brandConfig && brandConfig.redirectUrlAfterLogin) {
+          target = brandConfig.redirectUrlAfterLogin;
+        } else {
+          // Fallback a InterPOS por defecto si no hay system
+          target = "https://pos.interfundeoms.edu.co";
+        }
+
+        console.log(`[Auth] Redirecting to: ${target}`);
+        throw redirect(303, target);
+      }
+    } catch (err) {
+      // Si el error es una redirección, dejarlo pasar (SvelteKit funciona así)
+      if ((err as any)?.status === 303 || (err as any)?.status === 307) {
+        throw err;
+      }
+
+      console.error("[Auth] Unexpected error during code exchange:", err);
+      return {
+        authInfo: {
+          valid: false,
+          message: "Ocurrió un error verificando tu sesión.",
+        },
+      };
     }
-  } catch (err) {
-    console.warn("Unexpected auth error:", err);
-    authInfo.valid = false;
-    authInfo.message = "No pudimos verificar el enlace. Intenta de nuevo.";
   }
 
-  // 3. Retornar carga normal con info de auth
-  return {
-    authInfo,
-  };
+  // 2. Si NO hay código, verificar si ya hay sesión activa
+  // Para redirigir automáticamente si el usuario entra a / estando logueado
+  const { session } = await locals.safeGetSession();
+  if (session && !code) {
+    // Si ya tiene sesión, y visita root, quizás queramos mandarlo al sistema por defecto o al que pida
+    if (system) {
+      const brandConfig = resolveBrand(system);
+      if (brandConfig?.redirectUrlAfterLogin) {
+        throw redirect(303, brandConfig.redirectUrlAfterLogin);
+      }
+    }
+  }
+
+  return {};
 };

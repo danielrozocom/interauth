@@ -28,6 +28,12 @@ export function createSupabaseBrowserClient({
       persistSession: true,
       autoRefreshToken: true,
     },
+    cookieOptions: {
+      domain: import.meta.env.DEV ? undefined : ".interfundeoms.edu.co",
+      path: "/",
+      sameSite: "lax",
+      secure: !import.meta.env.DEV,
+    },
     global: {
       fetch,
     },

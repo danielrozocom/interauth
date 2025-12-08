@@ -25,10 +25,27 @@ export function createSupabaseServerClient({
     cookies: {
       get: (key) => cookies.get(key),
       set: (key, value, options) => {
-        cookies.set(key, value, { ...options, path: "/" });
+        cookies.set(key, value, {
+          ...options,
+          path: "/",
+          // Allow cookie sharing across subdomains (e.g. auth.interfundeoms.edu.co -> pos.interfundeoms.edu.co)
+          domain:
+            process.env.NODE_ENV === "development"
+              ? undefined
+              : ".interfundeoms.edu.co",
+          sameSite: "lax",
+          secure: process.env.NODE_ENV !== "development",
+        });
       },
       remove: (key, options) => {
-        cookies.delete(key, { ...options, path: "/" });
+        cookies.delete(key, {
+          ...options,
+          path: "/",
+          domain:
+            process.env.NODE_ENV === "development"
+              ? undefined
+              : ".interfundeoms.edu.co",
+        });
       },
     },
     auth: {

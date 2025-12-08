@@ -9,7 +9,12 @@
   type Step = "login" | "email" | "otp" | "new_password" | "success";
   let currentStep: Step = "login";
 
-  let loading = false;
+  let isPasswordSubmitting = false;
+  let isGoogleSubmitting = false;
+
+  // Derived state to check if ANY loading is happening
+  $: isLoading = isPasswordSubmitting || isGoogleSubmitting;
+
   let email = "";
   let password = "";
   let confirmPassword = "";
@@ -65,14 +70,14 @@
 
   // Paso 1: Enviar OTP
   async function sendOtpCode() {
-    loading = true;
+    isPasswordSubmitting = true;
     infoMessage = null;
     isError = false;
 
     if (!validateEmail(email)) {
       infoMessage = "Ingresa un email válido.";
       isError = true;
-      loading = false;
+      isPasswordSubmitting = false;
       return;
     }
 
@@ -92,34 +97,33 @@
 
       // Éxito: Pasar al paso 2
       currentStep = "otp";
-      infoMessage =
-        "Te enviamos un código a tu correo. Escríbelo para continuar.";
+      infoMessage = null;
       isError = false;
       startCooldown();
     } catch (err: any) {
       console.error("Error enviando OTP:", err);
       if (err.message && err.message.includes("Signups not allowed for otp")) {
-        infoMessage = "Correo no encontrado";
+        infoMessage = "No pudimos encontrar una cuenta con este correo.";
       } else {
         infoMessage =
           err.message || "No pudimos enviar el código. Intenta de nuevo.";
       }
       isError = true;
     } finally {
-      loading = false;
+      isPasswordSubmitting = false;
     }
   }
 
   // Paso 2: Verificar OTP
   async function verifyOtpCode() {
-    loading = true;
+    isPasswordSubmitting = true;
     infoMessage = null;
     isError = false;
 
     if (!otpCode || otpCode.length < 6) {
       infoMessage = "El código debe tener 6 dígitos.";
       isError = true;
-      loading = false;
+      isPasswordSubmitting = false;
       return;
     }
 
@@ -145,27 +149,27 @@
       infoMessage = "El código no es válido o ya expiró. Pide uno nuevo.";
       isError = true;
     } finally {
-      loading = false;
+      isPasswordSubmitting = false;
     }
   }
 
   // Paso 3: Cambiar Contraseña Final
   async function updatePasswordFinal() {
-    loading = true;
+    isPasswordSubmitting = true;
     infoMessage = null;
     isError = false;
 
     if (!password || password.length < 6) {
       infoMessage = "La contraseña debe tener al menos 6 caracteres.";
       isError = true;
-      loading = false;
+      isPasswordSubmitting = false;
       return;
     }
 
     if (password !== confirmPassword) {
       infoMessage = "Las contraseñas no coinciden.";
       isError = true;
-      loading = false;
+      isPasswordSubmitting = false;
       return;
     }
 
@@ -186,7 +190,7 @@
         // NO hacer signOut aquí, porque mata la sesión obtenida por OTP
         // y el usuario no podrá intentar con otra contraseña sin volver a empezar.
 
-        loading = false;
+        isPasswordSubmitting = false;
         return;
       }
 
@@ -225,13 +229,13 @@
       }
       isError = true;
     } finally {
-      loading = false;
+      isPasswordSubmitting = false;
     }
   }
 
   // Login Normal (Legacy)
   async function loginWithEmail() {
-    loading = true;
+    isPasswordSubmitting = true;
     infoMessage = null;
     isError = false;
 
@@ -248,26 +252,30 @@
       infoMessage = "Credenciales inválidas";
       isError = true;
     } finally {
-      loading = false;
+      isPasswordSubmitting = false;
     }
   }
 
   async function loginWithGoogle() {
-    loading = true; // Use global loading state
+    isGoogleSubmitting = true;
     try {
       const { data: res, error } = await (
         data as any
       ).supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: data?.brandConfig?.redirectUrlAfterLogin || "/",
+          redirectTo: `${window.location.origin}/?system=${
+            (data as any).system || "auth"
+          }`,
         },
       });
       if (res?.url) window.location.href = res.url;
     } catch (err) {
       console.error(err);
-      loading = false;
+      isGoogleSubmitting = false;
     }
+    // Note: We don't set isGoogleSubmitting = false in success case immediately
+    // because page redirect will happen. usage depends on provider.
   }
 
   function resetFlow() {
@@ -348,15 +356,15 @@
           <PasswordInput
             bind:value={password}
             placeholder="Contraseña"
-            disabled={loading}
+            disabled={isLoading}
           />
 
           <button
             on:click={loginWithEmail}
             class="login-btn mb-2"
-            disabled={loading || !password || !validateEmail(email)}
+            disabled={isLoading || !password || !validateEmail(email)}
           >
-            {#if loading}
+            {#if isPasswordSubmitting}
               <span class="spinner"></span>
             {:else}
               <span>Iniciar sesión con correo</span>
@@ -373,6 +381,7 @@
 
           <button
             class="link-btn"
+            disabled={isLoading}
             on:click={() => {
               currentStep = "email";
               password = ""; // Clear password to prevent pre-fill
@@ -388,13 +397,14 @@
         <button
           on:click={loginWithGoogle}
           class="login-btn mb-3 mobile-google-btn"
-          disabled={loading}
+          disabled={isLoading}
           aria-label="Iniciar sesión con Google"
         >
-          {#if loading}
+          {#if isGoogleSubmitting}
             <span class="spinner" aria-hidden="true"></span>
             <span>Redirigiendo…</span>
           {:else}
+            <!-- Google Icon: Shown ONLY when NOT submitting Google -->
             <span class="g-mark" aria-hidden="true">
               <svg
                 width="16"
@@ -442,9 +452,9 @@
           <button
             on:click={sendOtpCode}
             class="login-btn mb-2"
-            disabled={loading || !validateEmail(email) || cooldownSeconds > 0}
+            disabled={isLoading || !validateEmail(email) || cooldownSeconds > 0}
           >
-            {#if loading}
+            {#if isPasswordSubmitting}
               <span class="spinner"></span>
             {:else if cooldownSeconds > 0}
               Espera {cooldownSeconds}s
@@ -477,9 +487,9 @@
           <button
             on:click={verifyOtpCode}
             class="login-btn mb-2"
-            disabled={loading || otpCode.length < 6}
+            disabled={isLoading || otpCode.length < 6}
           >
-            {#if loading}
+            {#if isPasswordSubmitting}
               <span class="spinner"></span>
             {:else}
               Verificar código
@@ -513,21 +523,21 @@
           <PasswordInput
             bind:value={password}
             placeholder="Nueva contraseña"
-            disabled={loading}
+            disabled={isLoading}
           />
           <PasswordInput
             bind:value={confirmPassword}
             placeholder="Confirmar contraseña"
-            disabled={loading}
+            disabled={isLoading}
           />
           <button
             on:click={updatePasswordFinal}
             class="login-btn mb-2"
-            disabled={loading ||
+            disabled={isLoading ||
               password.length < 6 ||
               password !== confirmPassword}
           >
-            {#if loading}
+            {#if isPasswordSubmitting}
               <span class="spinner"></span>
             {:else}
               Cambiar contraseña
