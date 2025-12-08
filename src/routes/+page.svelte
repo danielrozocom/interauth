@@ -263,6 +263,12 @@
         target = (data as any).defaultRedirect;
       }
 
+      console.log("--- Login Redirect Debug ---");
+      console.log("Current URL:", window.location.href);
+      console.log("Redirect To Param:", redirectTo);
+      console.log("Final Redirect URL:", target);
+      console.log("-------------------------------");
+
       window.location.replace(target);
     } catch (err: any) {
       infoMessage = "Credenciales inválidas";

@@ -65,6 +65,12 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
         result.redirectUrl = DEFAULT_REDIRECT_URL;
       }
     }
+
+    console.log("--- Callback Redirect Debug ---");
+    console.log("Current URL:", url.toString());
+    console.log("Redirect To Param:", redirectTo);
+    console.log("Final Redirect URL:", result.redirectUrl);
+    console.log("-------------------------------");
   } catch (err: any) {
     console.error("Excepción en callback:", err);
     result.message = "Ocurrió un error inesperado al procesar la solicitud.";
