@@ -5,6 +5,7 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
   const next = url.searchParams.get("next");
   const system = url.searchParams.get("system");
   const type = url.searchParams.get("type"); // recovery, signup, etc.
+  const redirectTo = url.searchParams.get("redirectTo"); // Nueva: URL externa para redirigir
 
   // Estado inicial de la respuesta
   const result = {
@@ -47,18 +48,23 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
     result.connected = true;
     result.message = "Verificado correctamente. Redirigiendo...";
 
-    // Logica de destino (similar a la original pero más simple)
-    if (next && next.startsWith("/")) {
+    // Lógica de destino actualizada
+    if (redirectTo && redirectTo.startsWith("http")) {
+      // Validar que sea una URL externa permitida (ej. dominios conocidos)
+      const allowedDomains = ["tu-pos.com", "interfundeoms.edu.co"]; // Agrega tus dominios permitidos
+      const urlObj = new URL(redirectTo);
+      if (allowedDomains.some((domain) => urlObj.hostname.includes(domain))) {
+        result.redirectUrl = redirectTo; // Redirige a la URL externa
+      } else {
+        result.redirectUrl = "/"; // Fallback si no permitida
+      }
+    } else if (next && next.startsWith("/")) {
       result.redirectUrl = next; // Ruta interna
     } else if (system === "pos") {
       result.redirectUrl = process.env.POS_URL || "/"; // Externa conocida
     } else if (system === "app") {
       result.redirectUrl = process.env.APP_URL || "/"; // Externa conocida
     } else if (type === "recovery") {
-      // Si es recuperación, mandamos al home (o donde esté el formulario de cambio de clave)
-      // O podemos manejarlo aquí mismo si el usuario quiere.
-      // Pero el usuario pidió "flujo completo... permitir cambiar contraseña".
-      // Si mandamos a "/" (home), el +page.svelte que hicimos antes detectará el evento 'recovery' y mostrará el form.
       result.redirectUrl = "/?type=recovery&code_valid=true";
     } else {
       result.redirectUrl = "/";
