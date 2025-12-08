@@ -28,18 +28,18 @@ ARG VITE_APP_URL
 ARG VITE_AUTH_ORIGIN
 
 # Create .env.production from build args for Vite
-RUN echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL" > .env.production && \
+RUN echo "PUBLIC_SUPABASE_URL=$VITE_SUPABASE_URL" > .env.production && \
     echo "SUPABASE_URL=$VITE_SUPABASE_URL" >> .env.production && \
-    echo "VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY" >> .env.production && \
+    echo "PUBLIC_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY" >> .env.production && \
     echo "SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY" >> .env.production && \
-    echo "VITE_APP_NAME=$VITE_APP_NAME" >> .env.production && \
-    echo "VITE_POS_CALLBACK_URL=$VITE_POS_CALLBACK_URL" >> .env.production && \
-    echo "VITE_APP_CALLBACK_URL=$VITE_APP_CALLBACK_URL" >> .env.production && \
-    echo "VITE_POS_CALLBACK_URL_DEV=$VITE_POS_CALLBACK_URL_DEV" >> .env.production && \
-    echo "VITE_APP_CALLBACK_URL_DEV=$VITE_APP_CALLBACK_URL_DEV" >> .env.production && \
-    echo "VITE_POS_URL=$VITE_POS_URL" >> .env.production && \
-    echo "VITE_APP_URL=$VITE_APP_URL" >> .env.production && \
-    echo "VITE_AUTH_ORIGIN=$VITE_AUTH_ORIGIN" >> .env.production
+    echo "PUBLIC_APP_NAME=$VITE_APP_NAME" >> .env.production && \
+    echo "PUBLIC_POS_CALLBACK_URL=$VITE_POS_CALLBACK_URL" >> .env.production && \
+    echo "PUBLIC_APP_CALLBACK_URL=$VITE_APP_CALLBACK_URL" >> .env.production && \
+    echo "PUBLIC_POS_CALLBACK_URL_DEV=$VITE_POS_CALLBACK_URL_DEV" >> .env.production && \
+    echo "PUBLIC_APP_CALLBACK_URL_DEV=$VITE_APP_CALLBACK_URL_DEV" >> .env.production && \
+    echo "PUBLIC_POS_URL=$VITE_POS_URL" >> .env.production && \
+    echo "PUBLIC_APP_URL=$VITE_APP_URL" >> .env.production && \
+    echo "PUBLIC_AUTH_ORIGIN=$VITE_AUTH_ORIGIN" >> .env.production
 
 # Build the application
 RUN pnpm build
