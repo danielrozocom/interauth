@@ -48,7 +48,7 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
   auth: {
     name: "InterAuth",
     primaryColor: "#35528C",
-    redirectUrlAfterLogin: "/auth/callback", // Local callback
+    redirectUrlAfterLogin: "/callback", // Local callback
     subtitle: "Portal",
   },
 };
