@@ -18,19 +18,26 @@ export const load: LayoutServerLoad = async ({
   const { session, user } = await safeGetSession();
 
   // Extraer el parámetro 'system' de la URL
-  const systemParam = url.searchParams.get("system");
+  let systemParam = url.searchParams.get("system");
 
-  // System parameter is always required
+  // Si no hay sistema, asumimos que es el portal de autenticación propio ("auth")
+  // Esto maneja automáticamente los casos de ?code= sin system, o visitas directas.
   if (!systemParam) {
-    throw error(400, "System parameter is required");
+    systemParam = "auth";
   }
 
   // Resolver la configuración del brand
-  const brandConfig = resolveBrand(systemParam);
+  let brandConfig = resolveBrand(systemParam);
 
-  // Si no existe la configuración, retornar error
+  // Si la configuración no existe (ej: ?system=invalido), fallar suavemente a "auth"
   if (!brandConfig) {
-    // Si el 'system' no está configurado, redirigimos al dominio principal
+    console.warn(`System '${systemParam}' not found, defaulting to 'auth'`);
+    brandConfig = resolveBrand("auth");
+  }
+
+  // Si incluso 'auth' falla (no debería), entonces sí redirigimos o error fatal
+  if (!brandConfig) {
+    // Fallback de última instancia
     throw redirect(307, "https://interfundeoms.edu.co");
   }
 

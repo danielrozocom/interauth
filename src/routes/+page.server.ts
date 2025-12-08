@@ -15,63 +15,38 @@ const ALLOWED_DOMAINS = [
 
 export const load: PageServerLoad = async ({ url, locals }) => {
   const code = url.searchParams.get("code");
-  const system = url.searchParams.get("system");
-  const redirectTo = url.searchParams.get("redirect_to");
+  // const system = url.searchParams.get("system"); // We might use this for UI context but not for redirecting away
+  // const redirectTo = url.searchParams.get("redirect_to"); // Ignore for auto-redirect
 
+  // 1. Si no hay código, carga normal
   if (!code) {
-    // No hay código de autenticación, cargar la página de login normalmente
     return {};
   }
 
-  // Procesar el código de autenticación
-  const supabase = locals.supabase;
-
+  // 2. Procesar el código silenciosamente
   try {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    const supabase = locals.supabase;
+    // Intentar intercambiar el código.
+    // Esto seteará las cookies de sesión si es exitoso.
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
-      console.error("Error al intercambiar código por sesión:", error);
-      return {
-        error:
-          "Error al procesar la autenticación. Verifica el enlace o inténtalo de nuevo.",
-      };
+      // code inválido, expirado, usado, etc.
+      // REGLA: "si no es válido → ignorar silenciosamente"
+      // Solo logueamos para debug del desarrollador, no mostramos error al usuario
+      console.warn("Silently ignoring invalid auth code:", error.message);
+    } else {
+      console.log("✅ Auth code exchanged successfully");
+      // Sesión establecida.
+      // REGLA: "continuar el login"
+      // NO REDIRIGIMOS. Dejamos que la página cargue con la sesión activa.
+      // El +page.svelte o +layout.svelte mostrarán el estado autenticado.
     }
-
-    // Sesión creada exitosamente, determinar la URL de redirección
-    let finalUrl = DEFAULT_REDIRECT;
-
-    const systemKey = system as keyof typeof SYSTEM_REDIRECTS;
-    if (systemKey && SYSTEM_REDIRECTS[systemKey]) {
-      finalUrl = SYSTEM_REDIRECTS[systemKey];
-    } else if (redirectTo) {
-      // Validar que el redirect_to esté en dominios permitidos y no cause loop
-      try {
-        const redirectUrl = new URL(redirectTo);
-        const fullDomain = `${redirectUrl.protocol}//${redirectUrl.host}`;
-
-        if (
-          ALLOWED_DOMAINS.includes(fullDomain) &&
-          fullDomain !== "https://auth.interfundeoms.edu.co"
-        ) {
-          finalUrl = redirectTo;
-        }
-      } catch (e) {
-        // URL inválida, usar default
-        console.warn("URL de redirección inválida:", redirectTo);
-      }
-    }
-
-    // Redirigir al destino final
-    throw redirect(302, finalUrl);
-  } catch (err: any) {
-    if (err?.status === 302) {
-      // Es el redirect intencional, relanzar
-      throw err;
-    }
-    console.error("Error inesperado en la autenticación:", err);
-    return {
-      error:
-        "Error inesperado durante la autenticación. Contacta al soporte si persiste.",
-    };
+  } catch (err) {
+    // REGLA: "No muestres errores visibles... El sistema debe ignorarlo sin romper la página."
+    console.warn("Unexpected error processing auth code (ignored):", err);
   }
+
+  // 3. Retornar carga normal, sin redirecciones ni errores visibles
+  return {};
 };

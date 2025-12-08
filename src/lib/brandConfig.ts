@@ -43,6 +43,14 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     redirectUrlAfterLogin: "https://app.interfundeoms.edu.co/auth/callback",
     subtitle: "Login",
   },
+
+  // Auth (Portal propio)
+  auth: {
+    name: "InterAuth",
+    primaryColor: "#35528C",
+    redirectUrlAfterLogin: "/auth/callback", // Local callback
+    subtitle: "Portal",
+  },
 };
 
 /**
