@@ -13,9 +13,46 @@
   let password = "";
   let forgotMode = false;
   let infoMessage: string | null = null;
+  let resetPasswordMode = false;
 
-  // Mostrar error del servidor si existe
-  $: if ((data as any).error) infoMessage = (data as any).error;
+  // Reactividad para detectar modo de recuperación o invitación
+  $: {
+    const authInfo = (data as any).authInfo;
+
+    // Si hay un info de auth, procesarlo
+    if (authInfo) {
+      // Caso 1: Código Válido + (Recovery o Invite) -> Modo Reset Password
+      if (
+        authInfo.valid &&
+        (authInfo.event === "recovery" || authInfo.event === "invite") &&
+        data.session
+      ) {
+        resetPasswordMode = true;
+        if (!infoMessage) infoMessage = authInfo.message;
+      }
+
+      // Caso 2: Código Válido + Login/Signup -> Autenticación exitosa
+      // Si el usuario ya tiene sesión y NO estamos en modo recuperación, redirigir al App/Target
+      else if (authInfo.valid && data.session && !resetPasswordMode) {
+        // Usuario logueado correctamente. Proceder al target.
+        // Usamos timeout para dar feedback visual breve si se desea, o inmediato.
+        const target = data?.brandConfig?.redirectUrlAfterLogin || "/";
+        // Usamos location.replace para navegar al destino final (app/dashboard)
+        // Esto cumple "Solo redirects controlados... después de login exitoso"
+        if (typeof window !== "undefined") {
+          window.location.replace(target);
+        }
+      }
+
+      // Caso 3: Código Inválido
+      else if (!authInfo.valid && authInfo.message) {
+        infoMessage = authInfo.message;
+      }
+    }
+
+    // Mostrar error del servidor si existe (data.error legacy)
+    if ((data as any).error) infoMessage = (data as any).error;
+  }
 
   // Función para validar formato de email
   function isValidEmail(email: string): boolean {
@@ -173,6 +210,29 @@
       } else {
         infoMessage = err.message || String(err);
       }
+    }
+  }
+
+  async function updatePassword() {
+    loadingReset = true;
+    infoMessage = null;
+
+    try {
+      const { error } = await (data as any).supabase.auth.updateUser({
+        password: password,
+      });
+
+      if (error) throw error;
+
+      infoMessage = "¡Contraseña actualizada! Iniciando sesión...";
+      setTimeout(() => {
+        // Redirigir al dashboard o donde corresponda
+        const target = data?.brandConfig?.redirectUrlAfterLogin || "/";
+        window.location.replace(target);
+      }, 1500);
+    } catch (err: any) {
+      console.error("Error actualizando contraseña:", err);
+      infoMessage = err.message || "No pudimos actualizar la contraseña.";
       loadingReset = false;
     }
   }
@@ -240,6 +300,35 @@
             }}
           >
             Olvidé mi contraseña
+          </button>
+        </div>
+      {:else if resetPasswordMode}
+        <div class="form-group">
+          <p>
+            Hola, <strong>{data.session?.user?.email}</strong>. Define tu nueva
+            contraseña.
+          </p>
+
+          <PasswordInput
+            id="new-password"
+            name="new-password"
+            bind:value={password}
+            placeholder="Nueva contraseña"
+            disabled={isLoading}
+          />
+
+          <button
+            on:click={updatePassword}
+            class="login-btn mb-2"
+            disabled={isLoading || !password || password.length < 6}
+            aria-busy={loadingReset}
+          >
+            {#if loadingReset}
+              <span class="spinner" aria-hidden="true"></span>
+              <span>Guardando...</span>
+            {:else}
+              <span>Actualizar contraseña</span>
+            {/if}
           </button>
         </div>
       {:else}

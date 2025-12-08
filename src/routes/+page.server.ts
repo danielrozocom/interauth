@@ -24,29 +24,38 @@ export const load: PageServerLoad = async ({ url, locals }) => {
   }
 
   // 2. Procesar el código silenciosamente
+  let authInfo = {
+    valid: false,
+    message: "",
+    event: url.searchParams.get("type") || "login", // 'recovery', 'signup', 'invite', 'magiclink'
+  };
+
   try {
     const supabase = locals.supabase;
     // Intentar intercambiar el código.
-    // Esto seteará las cookies de sesión si es exitoso.
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
-      // code inválido, expirado, usado, etc.
-      // REGLA: "si no es válido → ignorar silenciosamente"
-      // Solo logueamos para debug del desarrollador, no mostramos error al usuario
-      console.warn("Silently ignoring invalid auth code:", error.message);
+      console.warn("Auth code invalid:", error.message);
+      authInfo.valid = false;
+      authInfo.message =
+        "El enlace ya no es válido o ha expirado. Por favor solicita uno nuevo.";
     } else {
       console.log("✅ Auth code exchanged successfully");
-      // Sesión establecida.
-      // REGLA: "continuar el login"
-      // NO REDIRIGIMOS. Dejamos que la página cargue con la sesión activa.
-      // El +page.svelte o +layout.svelte mostrarán el estado autenticado.
+      authInfo.valid = true;
+      authInfo.message = "Verificado correctamente.";
+
+      // Si el código no tenía type, asumimos login.
+      // Si Supabase devuelve sesión, el usuario está logueado.
     }
   } catch (err) {
-    // REGLA: "No muestres errores visibles... El sistema debe ignorarlo sin romper la página."
-    console.warn("Unexpected error processing auth code (ignored):", err);
+    console.warn("Unexpected auth error:", err);
+    authInfo.valid = false;
+    authInfo.message = "No pudimos verificar el enlace. Intenta de nuevo.";
   }
 
-  // 3. Retornar carga normal, sin redirecciones ni errores visibles
-  return {};
+  // 3. Retornar carga normal con info de auth
+  return {
+    authInfo,
+  };
 };
