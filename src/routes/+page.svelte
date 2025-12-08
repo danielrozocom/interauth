@@ -3,9 +3,11 @@
   import PasswordInput from "$lib/components/PasswordInput.svelte";
   import { onMount, onDestroy } from "svelte";
   import { goto } from "$app/navigation";
-  import { supabase } from "$lib/supabaseClient";
+  import { createSupabaseBrowserClient } from "$lib/supabase/browserClient";
 
   export let data: PageData;
+
+  const supabase = createSupabaseBrowserClient({});
 
   // Estados del flujo
   type Step = "login" | "email" | "otp" | "new_password" | "success";
