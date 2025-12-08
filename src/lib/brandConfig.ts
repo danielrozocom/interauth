@@ -155,3 +155,8 @@ export function isSystemValid(system: string | null | undefined): boolean {
 export function getAvailableSystems(): string[] {
   return Object.keys(BRAND_CONFIG);
 }
+
+/**
+ * URL de redirección por defecto si no se especifica ninguna otra
+ */
+export const DEFAULT_REDIRECT_URL = "https://pos.interfundeoms.edu.co";

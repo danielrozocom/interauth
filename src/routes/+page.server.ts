@@ -3,6 +3,7 @@ import {
   resolveBrand,
   hasSupabaseReservedParam,
   isSystemValid,
+  DEFAULT_REDIRECT_URL,
 } from "$lib/brandConfig";
 import type { PageServerLoad } from "./$types";
 
@@ -10,8 +11,6 @@ const SYSTEM_REDIRECTS = {
   interpos: "https://pos.interfundeoms.edu.co",
   otro: "https://loquesiga.interfundeoms.edu.co",
 };
-
-const DEFAULT_REDIRECT = "https://pos.interfundeoms.edu.co";
 
 const ALLOWED_DOMAINS = [
   "https://auth.interfundeoms.edu.co",
@@ -59,13 +58,13 @@ export const load: PageServerLoad = async ({ url, locals }) => {
         const brandConfig = resolveBrand(system || "auth");
         let target = "/";
 
-        if (redirectTo && redirectTo.startsWith("http")) {
+        if (redirectTo) {
           target = redirectTo;
         } else if (brandConfig && brandConfig.redirectUrlAfterLogin) {
           target = brandConfig.redirectUrlAfterLogin;
         } else {
           // Fallback a InterPOS por defecto si no hay system
-          target = "https://pos.interfundeoms.edu.co";
+          target = DEFAULT_REDIRECT_URL;
         }
 
         console.log(`[Auth] Redirecting to: ${target}`);
@@ -91,6 +90,13 @@ export const load: PageServerLoad = async ({ url, locals }) => {
   // Para redirigir automáticamente si el usuario entra a / estando logueado
   const { session } = await locals.safeGetSession();
   if (session && !code) {
+    const redirectTo =
+      url.searchParams.get("redirectTo") || url.searchParams.get("redirect_to");
+
+    if (redirectTo) {
+      throw redirect(303, redirectTo);
+    }
+
     // Si ya tiene sesión, y visita root, quizás queramos mandarlo al sistema por defecto o al que pida
     if (system) {
       const brandConfig = resolveBrand(system);
@@ -116,5 +122,6 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     invalidAccess: false,
     system: system || null,
     brandConfig: brandCfg,
+    defaultRedirect: DEFAULT_REDIRECT_URL,
   };
 };

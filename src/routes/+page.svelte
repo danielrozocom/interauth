@@ -255,10 +255,12 @@
         urlParams.get("redirectTo") || urlParams.get("redirect_to");
 
       let target = "/";
-      if (redirectTo && redirectTo.startsWith("http")) {
+      if (redirectTo) {
         target = redirectTo;
       } else if (data?.brandConfig?.redirectUrlAfterLogin) {
         target = data.brandConfig.redirectUrlAfterLogin;
+      } else if ((data as any)?.defaultRedirect) {
+        target = (data as any).defaultRedirect;
       }
 
       window.location.replace(target);
