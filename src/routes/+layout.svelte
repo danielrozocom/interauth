@@ -13,13 +13,10 @@
 
   // Debug logs for env vars
   if (browser) {
+    console.log("DEBUG VITE_SUPABASE_URL", import.meta.env.VITE_SUPABASE_URL);
     console.log(
-      "DEBUG PUBLIC_SUPABASE_URL",
-      import.meta.env.PUBLIC_SUPABASE_URL
-    );
-    console.log(
-      "DEBUG PUBLIC_SUPABASE_ANON_KEY",
-      import.meta.env.PUBLIC_SUPABASE_ANON_KEY ? "SET" : "UNSET"
+      "DEBUG VITE_SUPABASE_ANON_KEY",
+      import.meta.env.VITE_SUPABASE_ANON_KEY ? "SET" : "UNSET"
     );
   }
 

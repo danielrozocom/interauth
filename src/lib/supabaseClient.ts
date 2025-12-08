@@ -5,20 +5,20 @@
  * Este cliente se usa en toda la aplicación para autenticación.
  *
  * Configuración requerida:
- * - PUBLIC_SUPABASE_URL: URL de tu instancia de Supabase (para cliente)
- * - PUBLIC_SUPABASE_ANON_KEY: Clave anónima de Supabase (para cliente)
+ * - VITE_SUPABASE_URL: URL de tu instancia de Supabase (para cliente)
+ * - VITE_SUPABASE_ANON_KEY: Clave anónima de Supabase (para cliente)
  * - SUPABASE_URL: URL de tu instancia de Supabase (para servidor)
  * - SUPABASE_ANON_KEY: Clave anónima de Supabase (para servidor)
  */
 
 import { createClient } from "@supabase/supabase-js";
 import { browser } from "$app/environment";
-// Obtener variables de entorno: en cliente usamos `PUBLIC_` y en servidor `process.env`
+// Obtener variables de entorno: en cliente usamos `VITE_` y en servidor `process.env`
 const supabaseUrl = browser
-  ? import.meta.env.PUBLIC_SUPABASE_URL
+  ? import.meta.env.VITE_SUPABASE_URL
   : process.env.SUPABASE_URL;
 const supabaseAnonKey = browser
-  ? import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+  ? import.meta.env.VITE_SUPABASE_ANON_KEY
   : process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -29,7 +29,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
     );
   } else {
     console.error(
-      "PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY must be set for the client."
+      "VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set for the client."
     );
   }
 }
