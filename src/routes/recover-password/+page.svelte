@@ -182,15 +182,14 @@
               />
             </svg>
           </div>
-          <h2>¡Revisa tu correo!</h2>
+          <h2>¡Solicitud enviada!</h2>
           <div class="form-group">
             <p>
-              Enviamos un enlace de recuperación a:<br />
-              <strong>{email}</strong>
+              Si tu correo <strong>{email}</strong> está registrado, te enviaremos
+              un mensaje con instrucciones para restablecer tu contraseña.
             </p>
             <p class="hint">
-              Haz clic en el enlace del correo para establecer una nueva
-              contraseña.
+              Revisa tu bandeja de entrada y la carpeta de spam.
             </p>
 
             <button

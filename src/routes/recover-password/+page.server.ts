@@ -5,10 +5,7 @@ import {
   hasSupabaseReservedParam,
   isSystemValid,
 } from "$lib/brandConfig";
-import {
-  createSupabaseServerClient,
-  createSupabaseAdminClient,
-} from "$lib/supabase/serverClient";
+import { createSupabaseServerClient } from "$lib/supabase/serverClient";
 
 export const load: PageServerLoad = async ({ url }) => {
   const system = url.searchParams.get("system");
@@ -52,39 +49,6 @@ export const actions: Actions = {
       return fail(400, { error: "Ingresa un correo válido." });
     }
 
-    // Check if user exists using signInWithOtp with shouldCreateUser: false
-    // This returns a clear error if the user doesn't exist
-    try {
-      const tempClient = createSupabaseServerClient({ request, cookies });
-      const { error: otpError } = await tempClient.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          shouldCreateUser: false,
-        },
-      });
-
-      // If there's an error, check if it indicates user doesn't exist
-      if (otpError) {
-        const msg = otpError.message?.toLowerCase() || "";
-        if (
-          msg.includes("signups not allowed") ||
-          msg.includes("user not found") ||
-          msg.includes("no user")
-        ) {
-          console.log("[Recovery] User not found for email:", email);
-          return fail(400, {
-            error: "No encontramos una cuenta asociada a este correo.",
-          });
-        }
-        // Other errors (rate limit, etc) - just log and continue
-        console.warn("[Recovery] OTP check returned error:", msg);
-      }
-      // If no error, user exists - OTP was sent but we won't use it
-      console.log("[Recovery] User verified for email:", email);
-    } catch (checkErr: any) {
-      console.warn("[Recovery] User check failed:", checkErr.message);
-    }
-
     const supabase = createSupabaseServerClient({ request, cookies });
 
     // Build the redirect URL for the password reset email
@@ -99,8 +63,8 @@ export const actions: Actions = {
     }
 
     try {
-      // Use resetPasswordForEmail instead of signInWithOtp
-      // This sends a password reset link, not an OTP code
+      // SECURITY: Do NOT validate if email exists before sending recovery link.
+      // This prevents user enumeration attacks. Always show neutral response.
       const { error } = await supabase.auth.resetPasswordForEmail(
         email.trim(),
         {
@@ -109,32 +73,54 @@ export const actions: Actions = {
       );
 
       if (error) {
-        console.error("Error al enviar enlace de recuperación:", error);
+        // Log the full error for debugging, but NEVER expose user existence to UI
+        console.error("[Recovery] Error details (internal only):", {
+          message: error.message,
+          status: (error as any).status,
+          code: (error as any).code,
+          email: email, // Log email for internal debugging
+        });
+
         const msg = (error.message || "").toLowerCase();
+        const status = (error as any).status;
+        const code = (error as any).code;
+
+        // Handle rate limit error - status 429 or specific code
+        // This is safe to expose since it doesn't reveal user existence
         if (
-          msg.includes("user not found") ||
-          msg.includes("no user") ||
-          msg.includes("not found") ||
-          msg.includes("signups not allowed")
+          status === 429 ||
+          code === "over_email_send_rate_limit" ||
+          msg.includes("rate limit") ||
+          msg.includes("you can only request this after")
         ) {
-          return fail(400, {
-            error: "No encontramos una cuenta asociada a este correo.",
+          console.log("[Recovery] Rate limit hit for email:", email);
+          return fail(429, {
+            error:
+              "Has solicitado demasiados intentos. Inténtalo de nuevo en unos segundos.",
+            isRateLimit: true,
           });
         }
 
-        return fail(400, {
-          error:
-            "No pudimos enviar el enlace. Inténtalo de nuevo en unos minutos.",
-        });
+        // For ALL other errors (including "user not found", "invalid email", etc.)
+        // show the SAME neutral success message to prevent user enumeration
+        // The actual error is already logged above for debugging
+        console.log("[Recovery] Returning neutral response for:", email);
+      } else {
+        console.log("[Recovery] Reset email sent successfully to:", email);
       }
+
+      // SECURITY: Always return success with neutral message
+      // This prevents attackers from discovering which emails are registered
     } catch (err) {
-      console.error("Error inesperado al enviar enlace de recuperación:", err);
-      return fail(400, {
+      // Network or server error - this is safe to show as it doesn't reveal user info
+      console.error("[Recovery] Unexpected error:", err);
+      return fail(500, {
         error:
-          "No fue posible enviar el enlace en este momento. Por favor inténtalo de nuevo en unos minutos.",
+          "Ocurrió un error al procesar tu solicitud. Inténtalo de nuevo más tarde.",
       });
     }
 
+    // Always return success with neutral message (handled in frontend)
     return { success: true };
   },
 };
