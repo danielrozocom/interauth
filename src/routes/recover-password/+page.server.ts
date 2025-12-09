@@ -42,8 +42,11 @@ export const actions: Actions = {
 
     // Preserve `system` from the original URL when building the
     // email redirect that Supabase will embed in the confirmation link.
-    // Only include it when present; otherwise keep existing behaviour.
     const system = url.searchParams.get("system");
+
+    if (!system) {
+      return fail(400, { error: "El parámetro 'system' es obligatorio." });
+    }
 
     if (!email) {
       return fail(400, { error: "El correo es obligatorio." });
@@ -69,22 +72,18 @@ export const actions: Actions = {
         url.origin;
 
       let emailRedirectTo: string;
-      if (system) {
-        // Build a reset-password URL that explicitly includes the `system`
-        // param and the original `redirect_to` so Supabase will embed them
-        // into the ConfirmationURL it sends by email.
-        const params = new URLSearchParams();
-        params.set("system", system);
-        if (redirectTo) params.set("redirect_to", redirectTo);
 
-        emailRedirectTo = `${AUTH_ORIGIN.replace(
-          /\/$/,
-          ""
-        )}/reset-password?${params.toString()}`;
-      } else {
-        // Preserve previous behaviour when `system` is absent.
-        emailRedirectTo = redirectTo || `${url.origin}/callback`;
-      }
+      // Build a reset-password URL that explicitly includes the `system`
+      // param and the original `redirect_to` so Supabase will embed them
+      // into the ConfirmationURL it sends by email.
+      const params = new URLSearchParams();
+      params.set("system", system);
+      if (redirectTo) params.set("redirect_to", redirectTo);
+
+      emailRedirectTo = `${AUTH_ORIGIN.replace(
+        /\/$/,
+        ""
+      )}/reset-password?${params.toString()}`;
 
       // Use the explicit password recovery API so Supabase sends the
       // official password recovery template (NOT a magic link login).

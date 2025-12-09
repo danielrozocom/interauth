@@ -27,7 +27,11 @@
     }
     // Build redirectTo param (used by the server action)
     const systemParam = params.get("system");
-    if (systemParam) {
+    const redirectParam = params.get("redirect_to");
+
+    if (redirectParam) {
+      redirectTo = redirectParam;
+    } else if (systemParam) {
       redirectTo = data.brandConfig?.redirectUrlAfterLogin || "";
     }
   });

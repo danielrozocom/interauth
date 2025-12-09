@@ -32,14 +32,31 @@ export const load: PageServerLoad = async ({ url, cookies, request }) => {
       };
     }
 
-    // Ensure tokens are present (we expect legacy recovery tokens). We do NOT
-    // establish a server-side session here; the browser will set the session
-    // temporarily to allow updating the password and then the app will clear
-    // it. This prevents treating recovery as a login flow.
-    if (!accessToken || !refreshToken) {
+    // Ensure tokens are present. Support both PKCE (code) and legacy (tokens).
+    if (code) {
+      const supabase = createSupabaseServerClient({ request, cookies });
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) {
+        return {
+          valid: false,
+          error: "El enlace de recuperación no es válido o ha expirado.",
+          system: null,
+          redirectTo: null,
+        };
+      }
+    } else if (!accessToken || !refreshToken) {
       return {
         valid: false,
         error: "Tokens de recuperación no encontrados en la URL.",
+        system: null,
+        redirectTo: null,
+      };
+    }
+
+    if (!system) {
+      return {
+        valid: false,
+        error: "Falta el parámetro 'system'.",
         system: null,
         redirectTo: null,
       };
