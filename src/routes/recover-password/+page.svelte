@@ -1,22 +1,48 @@
 ﻿<script lang="ts">
-  import type { PageData } from "./$types";
-  import { onDestroy, onMount } from "svelte";
+  import type { PageData, ActionData } from "./$types";
+  import { onDestroy, onMount, untrack } from "svelte";
   import { goto } from "$app/navigation";
   import { get } from "svelte/store";
   import { recoveryEmail } from "$lib/recoveryStore";
   import { enhance } from "$app/forms";
+  import type { SubmitFunction } from "@sveltejs/kit";
 
-  export let data: PageData;
+  let { data, form } = $props<{ data: PageData; form: ActionData }>();
 
   type Step = "email" | "sent";
-  let currentStep: Step = "email";
 
-  let isSubmitting = false;
-  let email = "";
-  let infoMessage: string | null = null;
-  let isError = false;
+  // Destructure initial values to avoid "captures initial value" warnings
+  // when initializing state.
+  const initialSuccess = form?.success;
+  const initialEmail = form?.email;
+  const initialError = form?.error;
 
-  let redirectTo = "";
+  let currentStep = $state<Step>(initialSuccess ? "sent" : "email");
+  let isSubmitting = $state(false);
+  let email = $state(initialEmail || "");
+  let infoMessage = $state<string | null>(initialError || null);
+  let isError = $state(!!initialError);
+
+  let redirectTo = $state("");
+
+  // Sync state when `form` prop updates (e.g. after enhance or navigation)
+  $effect(() => {
+    if (form) {
+      untrack(() => {
+        if (form?.success) {
+          currentStep = "sent";
+          startCooldown();
+        } else if (form?.error) {
+          isError = true;
+          infoMessage = form.error;
+          currentStep = "email";
+        }
+        if (form?.email) {
+          email = form.email;
+        }
+      });
+    }
+  });
 
   onMount(() => {
     const params = new URLSearchParams(window.location.search);
@@ -36,7 +62,7 @@
     }
   });
 
-  let cooldownSeconds = 0;
+  let cooldownSeconds = $state(0);
   let timer: any;
 
   function startCooldown() {
@@ -59,13 +85,15 @@
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
   }
 
-  function handleEnhance() {
+  const handleEnhance: SubmitFunction = () => {
     isSubmitting = true;
     infoMessage = null;
     isError = false;
+    console.log("Submitting form via enhance...");
 
-    return async ({ result }: { result: any }) => {
+    return async ({ result }) => {
       isSubmitting = false;
+      console.log("Enhance result:", result);
       if (result.type === "success") {
         currentStep = "sent";
         startCooldown();
@@ -78,7 +106,7 @@
         infoMessage = "Error del servidor";
       }
     };
-  }
+  };
 
   function goToLogin() {
     const params = new URLSearchParams(window.location.search);
@@ -132,10 +160,11 @@
           <form
             class="form-group"
             method="POST"
-            action="?/sendRecoveryLink"
+            action="?/sendRecoveryLink&system={data.system || ''}"
             use:enhance={handleEnhance}
           >
             <input type="hidden" name="redirectTo" value={redirectTo} />
+            <input type="hidden" name="system" value={data.system || ""} />
             <input
               type="email"
               name="email"
@@ -163,7 +192,7 @@
                 {infoMessage}
               </div>
             {/if}
-            <button type="button" class="link-btn" on:click={goToLogin}>
+            <button type="button" class="link-btn" onclick={goToLogin}>
               Volver al login
             </button>
           </form>
@@ -200,7 +229,7 @@
               type="button"
               class="link-btn"
               disabled={cooldownSeconds > 0}
-              on:click={() => {
+              onclick={() => {
                 currentStep = "email";
               }}
               style:opacity={cooldownSeconds > 0 ? "0.5" : "1"}
@@ -213,7 +242,7 @@
               {/if}
             </button>
 
-            <button type="button" class="link-btn" on:click={goToLogin}>
+            <button type="button" class="link-btn" onclick={goToLogin}>
               Volver al login
             </button>
           </div>

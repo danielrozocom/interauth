@@ -42,7 +42,15 @@ export const actions: Actions = {
 
     // Preserve `system` from the original URL when building the
     // email redirect that Supabase will embed in the confirmation link.
-    const system = url.searchParams.get("system");
+    // Also check formData because the action URL might strip query params.
+    const system =
+      url.searchParams.get("system") || (formData.get("system") as string);
+
+    console.log("sendRecoveryLink action called", {
+      email,
+      system,
+      redirectTo,
+    });
 
     if (!system) {
       return fail(400, { error: "El parámetro 'system' es obligatorio." });
@@ -105,11 +113,13 @@ export const actions: Actions = {
           msg.includes("signups not allowed")
         ) {
           return fail(400, {
+            email,
             error: "No encontramos una cuenta asociada a este correo.",
           });
         }
 
         return fail(400, {
+          email,
           error:
             "No pudimos enviar el código. Inténtalo de nuevo en unos minutos.",
         });
@@ -117,11 +127,12 @@ export const actions: Actions = {
     } catch (err) {
       console.error("Error inesperado al enviar OTP de recuperación:", err);
       return fail(400, {
+        email,
         error:
           "No fue posible enviar el código en este momento. Por favor inténtalo de nuevo en unos minutos.",
       });
     }
 
-    return { success: true };
+    return { success: true, email };
   },
 };
