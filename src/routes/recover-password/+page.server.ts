@@ -96,7 +96,7 @@ export const actions: Actions = {
           console.log("[Recovery] Rate limit hit for email:", email);
           return fail(429, {
             error:
-              "Has solicitado demasiados intentos. Inténtalo de nuevo en unos segundos.",
+              "Has enviado varias solicitudes de recuperación. Prueba nuevamente en unos momentos.",
             isRateLimit: true,
           });
         }

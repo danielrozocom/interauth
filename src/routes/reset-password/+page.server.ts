@@ -7,7 +7,8 @@ import {
 } from "$lib/brandConfig";
 
 export const load: PageServerLoad = async ({ url, cookies, request }) => {
-  // Extract URL parameters
+  // Extract URL parameters - support both PKCE and legacy flows
+  const code = url.searchParams.get("code") || url.searchParams.get("token");
   const accessToken = url.searchParams.get("access_token");
   const refreshToken = url.searchParams.get("refresh_token");
   const type = url.searchParams.get("type");
@@ -17,8 +18,12 @@ export const load: PageServerLoad = async ({ url, cookies, request }) => {
 
   const isDev = process.env.NODE_ENV === "development";
 
-  // Validate this is actually a recovery flow
-  if (type !== "recovery") {
+  // Determine which flow we're using
+  const hasPkceCode = !!code;
+  const hasLegacyTokens = type === "recovery" && accessToken && refreshToken;
+
+  // Must have either PKCE code or legacy tokens
+  if (!hasPkceCode && !hasLegacyTokens) {
     return {
       valid: false,
       error:
@@ -28,31 +33,42 @@ export const load: PageServerLoad = async ({ url, cookies, request }) => {
     };
   }
 
-  // Check for required tokens
-  if (!accessToken || !refreshToken) {
-    return {
-      valid: false,
-      error:
-        "Tokens de recuperación no encontrados. Por favor solicita un nuevo enlace.",
-      system: null,
-      redirectTo: null,
-    };
-  }
-
-  // Create Supabase client and set session
+  // Create Supabase client
   const supabase = createSupabaseServerClient({ request, cookies });
 
   try {
-    const { error: setSessionError } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    let sessionError: Error | null = null;
 
-    if (setSessionError) {
-      console.error(
-        "[ResetPassword] Error setting session:",
-        setSessionError.message
-      );
+    if (hasPkceCode) {
+      // PKCE flow: exchange code for session
+      console.log("[ResetPassword] Processing PKCE code flow...");
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) {
+        console.error(
+          "[ResetPassword] exchangeCodeForSession error:",
+          error.message
+        );
+        sessionError = error;
+      } else {
+        console.log(
+          "[ResetPassword] PKCE code exchanged successfully for:",
+          data.session?.user?.email
+        );
+      }
+    } else if (hasLegacyTokens) {
+      // Legacy flow: set session with tokens
+      console.log("[ResetPassword] Processing legacy token flow...");
+      const { error } = await supabase.auth.setSession({
+        access_token: accessToken!,
+        refresh_token: refreshToken!,
+      });
+      if (error) {
+        console.error("[ResetPassword] setSession error:", error.message);
+        sessionError = error;
+      }
+    }
+
+    if (sessionError) {
       return {
         valid: false,
         error:
