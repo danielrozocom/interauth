@@ -41,39 +41,24 @@ export const actions: Actions = {
       return fail(400, { error: "El correo es obligatorio." });
     }
 
-    // Paso 1: Validar que el usuario exista usando el cliente admin
-    try {
-      const adminClient = createSupabaseAdminClient();
-      const { data: userData, error: userError } =
-        await adminClient.auth.admin.getUserByEmail(email.trim());
-
-      if (userError || !userData?.user) {
-        return fail(400, {
-          error: "No encontramos una cuenta asociada a este correo.",
-        });
-      }
-    } catch (error) {
-      console.error("Error al verificar usuario:", error);
-      return fail(500, {
-        error: "Error al verificar el correo. Intenta nuevamente.",
-      });
-    }
-
-    // Paso 2: Si el usuario existe, enviar el email de recuperación
     const supabase = createSupabaseServerClient({ request, cookies });
 
+    // Enviar email de recuperación
+    // Nota: Supabase no revelará si el email existe o no por seguridad
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: redirectTo || `${url.origin}/callback`,
     });
 
     if (error) {
       console.error("Error al enviar email de recuperación:", error);
+      // Mensaje sutil por seguridad
       return fail(400, {
         error:
-          "No se pudo enviar el código de verificación. Intenta nuevamente.",
+          "Si el correo está registrado, recibirás un código de verificación.",
       });
     }
 
+    // Siempre retornar éxito para no filtrar información
     return { success: true };
   },
 };
