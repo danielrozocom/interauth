@@ -10,7 +10,7 @@
 
   const supabase = createSupabaseBrowserClient({});
 
-  type Step = "email" | "otp" | "new_password" | "success";
+  type Step = "email" | "otp" | "new_password" | "success" | "link_sent";
   let currentStep: Step = "email";
 
   let isPasswordSubmitting = false;
@@ -46,7 +46,7 @@
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
   }
 
-  async function sendOtpCode() {
+  async function sendRecoveryLink() {
     isPasswordSubmitting = true;
     infoMessage = null;
     isError = false;
@@ -61,20 +61,29 @@
     if (cooldownSeconds > 0) return;
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: { shouldCreateUser: false },
+      const params = new URLSearchParams(window.location.search);
+      const redirectTo = new URL(`${window.location.origin}/callback`);
+      params.forEach((value, key) => {
+        redirectTo.searchParams.set(key, value);
       });
+
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        {
+          redirectTo: redirectTo.toString(),
+        }
+      );
+
       if (error) throw error;
-      currentStep = "otp";
+      currentStep = "link_sent";
       startCooldown();
     } catch (err: any) {
-      console.error("Error enviando OTP:", err);
+      console.error("Error enviando link:", err);
       if (err?.message && err.message.includes("Signups not allowed for otp")) {
         infoMessage = "No pudimos encontrar una cuenta con este correo.";
       } else {
         infoMessage =
-          err?.message || "No pudimos enviar el código. Intenta de nuevo.";
+          err?.message || "No pudimos enviar el enlace. Intenta de nuevo.";
       }
       isError = true;
     } finally {
@@ -82,6 +91,7 @@
     }
   }
 
+  // Deprecated OTP functions kept but unused in new flow
   async function verifyOtpCode() {
     isPasswordSubmitting = true;
     infoMessage = null;
@@ -178,9 +188,8 @@
   }
 
   function goToLogin() {
-    const system = data.system;
-    const url = system ? `/?system=${system}` : "/";
-    goto(url);
+    const params = new URLSearchParams(window.location.search);
+    goto(`/?${params.toString()}`);
   }
 </script>
 
@@ -222,7 +231,7 @@
       <div class="card-body">
         {#if currentStep === "email"}
           <h2>Recuperar Contraseña</h2>
-          <p>Ingresa tu correo para recibir un código de acceso.</p>
+          <p>Ingresa tu correo para recibir un enlace de recuperación.</p>
           <img
             src="/favicon.svg"
             alt="Logo"
@@ -237,7 +246,7 @@
               class="input"
             />
             <button
-              on:click={sendOtpCode}
+              on:click={sendRecoveryLink}
               class="login-btn mb-2"
               disabled={isLoading ||
                 !validateEmail(email) ||
@@ -245,13 +254,39 @@
             >
               {#if isPasswordSubmitting}<span class="spinner"
                 ></span>{:else if cooldownSeconds > 0}Espera {cooldownSeconds}s{:else}Enviar
-                código{/if}
+                enlace{/if}
             </button>
             {#if infoMessage}<div
                 class={isError ? "error-message" : "info-message"}
               >
                 {infoMessage}
               </div>{/if}
+            <button class="link-btn" on:click={goToLogin}
+              >Volver al login</button
+            >
+          </div>
+        {:else if currentStep === "link_sent"}
+          <h2>Revisa tu correo</h2>
+          <p>
+            Hemos enviado un enlace de recuperación a <strong>{email}</strong>
+          </p>
+          <img src="/favicon.svg" alt="Logo" class="top-logo" />
+          <div class="form-group">
+            <p
+              style="text-align:center; margin-bottom: 1rem; font-size: 0.9rem; color: #666;"
+            >
+              Haz clic en el enlace del correo para restablecer tu contraseña.
+              Si no lo encuentras, revisa la carpeta de spam.
+            </p>
+            <button
+              class="link-btn"
+              disabled={isLoading || cooldownSeconds > 0}
+              style:opacity={cooldownSeconds > 0 ? "0.5" : "1"}
+              style:cursor={cooldownSeconds > 0 ? "not-allowed" : "pointer"}
+              on:click={sendRecoveryLink}
+              >{#if cooldownSeconds > 0}Reenviar en {cooldownSeconds}s{:else}Reenviar
+                enlace{/if}</button
+            >
             <button class="link-btn" on:click={goToLogin}
               >Volver al login</button
             >

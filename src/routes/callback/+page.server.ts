@@ -52,11 +52,22 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
     result.message = "Verificado correctamente. Redirigiendo...";
 
     // Lógica de destino actualizada
-    if (redirectTo) {
+    if (type === "recovery") {
+      const params = new URLSearchParams();
+      params.set("type", "recovery");
+      params.set("code_valid", "true");
+
+      // Preserve all other parameters
+      url.searchParams.forEach((value, key) => {
+        if (!["code", "type", "next"].includes(key)) {
+          params.set(key, value);
+        }
+      });
+
+      result.redirectUrl = "/?" + params.toString();
+    } else if (redirectTo) {
       // Redirigir exactamente a la URL solicitada
       result.redirectUrl = redirectTo;
-    } else if (type === "recovery") {
-      result.redirectUrl = "/?type=recovery&code_valid=true";
     } else {
       const brandConfig = resolveBrand(system);
       if (brandConfig && brandConfig.redirectUrlAfterLogin) {

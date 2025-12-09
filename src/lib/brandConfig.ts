@@ -32,7 +32,7 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
   pos: {
     name: "InterPOS",
     primaryColor: "#35528C",
-    redirectUrlAfterLogin: "https://pos.interfundeoms.edu.co/auth/callback",
+    redirectUrlAfterLogin: "https://pos.interfundeoms.edu.co/",
     subtitle: "Login",
   },
 
@@ -40,7 +40,7 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
   app: {
     name: "InterAPP",
     primaryColor: "#35528C",
-    redirectUrlAfterLogin: "https://app.interfundeoms.edu.co/auth/callback",
+    redirectUrlAfterLogin: "https://app.interfundeoms.edu.co",
     subtitle: "Login",
   },
 };

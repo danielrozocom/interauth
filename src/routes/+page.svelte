@@ -421,11 +421,8 @@
             class="link-btn"
             disabled={isLoading}
             on:click={() => {
-              const system = data.system;
-              const url = system
-                ? `/recover-password?system=${system}`
-                : "/recover-password";
-              goto(url);
+              const params = new URLSearchParams(window.location.search);
+              goto(`/recover-password?${params.toString()}`);
             }}
           >
             ¿Olvidaste tu contraseña?
