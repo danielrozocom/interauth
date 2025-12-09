@@ -21,6 +21,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
   const code = url.searchParams.get("code");
   const system = url.searchParams.get("system");
   const hasSupabaseFlow = hasSupabaseReservedParam(url.searchParams);
+  const isDev = process.env.NODE_ENV === "development";
 
   // 1. Procesar intercambio de código (Sign In with Google/Magic Link)
   if (code) {
@@ -50,8 +51,27 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 
       if (user) {
         console.log(`[Auth] User authenticated: ${user.email}`);
+        // Normalize target for development: if target is relative use current origin,
+        // and if running in dev replace production host with current origin so
+        // the whole flow stays on localhost.
+        const isDev = process.env.NODE_ENV === "development";
+        let finalTarget = target;
+        try {
+          if (finalTarget.startsWith("/")) {
+            finalTarget = `${url.origin}${finalTarget}`;
+          } else if (isDev) {
+            const parsed = new URL(finalTarget);
+            // If target points to the interfundeoms domain, rewrite to current origin
+            if (parsed.host && parsed.host.includes("interfundeoms")) {
+              finalTarget = `${url.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+            }
+          }
+        } catch (e) {
+          // If parsing failed, keep original target
+        }
 
-        // Resolver la redirección
+        console.log(`[Auth] Redirecting to: ${finalTarget}`);
+        throw redirect(303, finalTarget);
         const redirectTo =
           url.searchParams.get("redirectTo") ||
           url.searchParams.get("redirect_to");
@@ -95,20 +115,53 @@ export const load: PageServerLoad = async ({ url, locals }) => {
       url.searchParams.get("redirectTo") || url.searchParams.get("redirect_to");
 
     if (redirectTo) {
-      throw redirect(303, redirectTo);
+      // Normalize redirectTo similarly to ensure local flows stay local in dev
+      const isDev = process.env.NODE_ENV === "development";
+      let final = redirectTo;
+      try {
+        if (final.startsWith("/")) final = `${url.origin}${final}`;
+        else if (isDev) {
+          const parsed = new URL(final);
+          if (parsed.host && parsed.host.includes("interfundeoms")) {
+            final = `${url.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+          }
+        }
+      } catch (e) {
+        // leave as-is
+      }
+      throw redirect(303, final);
     }
 
     // Si ya tiene sesión, y visita root, quizás queramos mandarlo al sistema por defecto o al que pida
     if (system) {
       const brandConfig = resolveBrand(system);
       if (brandConfig?.redirectUrlAfterLogin) {
-        throw redirect(303, brandConfig.redirectUrlAfterLogin);
+        // Resolve relative/local redirect in server context using current origin
+        const redir = brandConfig.redirectUrlAfterLogin;
+        let final = redir;
+        try {
+          if (final.startsWith("/")) final = `${url.origin}${final}`;
+          else if (process.env.NODE_ENV === "development") {
+            const parsed = new URL(final);
+            if (parsed.host && parsed.host.includes("interfundeoms")) {
+              final = `${url.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+        throw redirect(303, final);
       }
     }
   }
 
   // Decide si este acceso es válido en base a `system` y a la presencia de parámetros de Supabase
-  const brandCfg = isSystemValid(system) ? resolveBrand(system) : null;
+  let brandCfg = isSystemValid(system) ? resolveBrand(system) : null;
+
+  // En local permitimos continuar sin `system`
+  if (!brandCfg && isDev) {
+    brandCfg = resolveBrand("local");
+  }
 
   // Si no es un flujo de Supabase y no hay system válido -> mostrar pantalla de acceso inválido
   if (!hasSupabaseFlow && !brandCfg) {

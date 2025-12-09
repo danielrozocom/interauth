@@ -73,11 +73,13 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 
     // Lógica de destino actualizada
     if (type === "recovery") {
-      // Para recovery, redirigir a la página principal con indicador de recovery
+      // For recovery, redirect to the dedicated reset-password page
       const params = new URLSearchParams();
       params.set("type", "recovery");
+      if (accessToken) params.set("access_token", accessToken);
+      if (refreshToken) params.set("refresh_token", refreshToken);
 
-      // Preserve all other parameters
+      // Preserve other parameters (system, redirect_to, etc.)
       url.searchParams.forEach((value, key) => {
         if (
           !["code", "access_token", "refresh_token", "type", "next"].includes(
@@ -88,7 +90,7 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
         }
       });
 
-      result.redirectUrl = "/?" + params.toString();
+      result.redirectUrl = "/reset-password?" + params.toString();
     } else if (redirectTo) {
       // Redirigir exactamente a la URL solicitada
       result.redirectUrl = redirectTo;

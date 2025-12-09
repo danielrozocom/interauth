@@ -2,6 +2,7 @@
   import type { PageData } from "./$types";
   import PasswordInput from "$lib/components/PasswordInput.svelte";
   import { onMount, onDestroy } from "svelte";
+  import { get } from "svelte/store";
   import { goto } from "$app/navigation";
   import { createSupabaseBrowserClient } from "$lib/supabase/browserClient";
   import { recoveryEmail } from "$lib/recoveryStore";
@@ -28,10 +29,22 @@
   let isError = false;
 
   onMount(() => {
+    // If an email appears in the URL (external link), move it to the internal store
+    // and remove it from the visible URL to avoid leaking emails in query strings.
     const params = new URLSearchParams(window.location.search);
     const emailParam = params.get("email");
     if (emailParam) {
-      email = emailParam;
+      recoveryEmail.set(emailParam);
+      // remove from URL without reloading
+      params.delete("email");
+      const newUrl = `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}${window.location.hash}`;
+      window.history.replaceState(window.history.state, "", newUrl);
+    }
+
+    // Prefer the stored email if present (preserves between views)
+    const stored = get(recoveryEmail);
+    if (stored) {
+      email = stored;
     }
 
     // Handle recovery flow
@@ -39,6 +52,7 @@
     if (typeParam === "recovery" && data.session && currentStep === "login") {
       currentStep = "new_password";
       email = data.session.user.email || "";
+      if (email) recoveryEmail.set(email);
       infoMessage = "Por favor establece una nueva contraseña.";
       isError = false;
     }
@@ -232,6 +246,8 @@
 
       // Check if this is a recovery flow
       const urlParams = new URLSearchParams(window.location.search);
+      // Never trust or propagate `email` via query string
+      urlParams.delete("email");
       const isRecovery = urlParams.get("type") === "recovery";
       const redirectTo =
         urlParams.get("redirectTo") || urlParams.get("redirect_to");
@@ -246,7 +262,7 @@
         } else if ((data as any)?.defaultRedirect) {
           target = (data as any).defaultRedirect;
         }
-        window.location.href = target;
+        window.location.href = normalizeRedirect(target);
         return;
       }
 
@@ -289,6 +305,8 @@
       if (error) throw error;
       // Redirigir
       const urlParams = new URLSearchParams(window.location.search);
+      // Prevent leaking email through redirect params
+      urlParams.delete("email");
       const redirectTo =
         urlParams.get("redirectTo") || urlParams.get("redirect_to");
 
@@ -320,6 +338,8 @@
     isGoogleSubmitting = true;
     try {
       const urlParams = new URLSearchParams(window.location.search);
+      // Ensure we don't propagate email in query params
+      urlParams.delete("email");
       const finalRedirectTo =
         urlParams.get("redirectTo") || urlParams.get("redirect_to");
 
@@ -339,7 +359,26 @@
         provider: "google",
         options: { redirectTo: callbackUrl },
       });
-      if (res?.url) window.location.href = res.url;
+      if (res?.url) {
+        // If the provider URL points to the production auth host, but we are running
+        // locally, rewrite it to use the current origin so the entire flow stays local.
+        const urlStr = res.url;
+        if (window.location.hostname === "localhost") {
+          try {
+            const parsed = new URL(urlStr);
+            if (parsed.host && parsed.host.includes("interfundeoms")) {
+              const rewritten = `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+              window.location.href = rewritten;
+            } else {
+              window.location.href = urlStr;
+            }
+          } catch (e) {
+            window.location.href = urlStr;
+          }
+        } else {
+          window.location.href = urlStr;
+        }
+      }
     } catch (err) {
       console.error(err);
       isGoogleSubmitting = false;
@@ -356,6 +395,25 @@
     otpCode = "";
     infoMessage = null;
     isError = false;
+  }
+
+  // Normaliza una URL de redirect para entorno local:
+  // - Si es relativa ("/"), la convierte en origin + path
+  // - Si estamos en localhost y la URL apunta a interfundeoms, sustituye el host por el origin
+  function normalizeRedirect(target: string) {
+    try {
+      if (target.startsWith("/")) return `${window.location.origin}${target}`;
+      const parsed = new URL(target);
+      if (
+        window.location.hostname === "localhost" &&
+        parsed.host.includes("interfundeoms")
+      ) {
+        return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      }
+      return target;
+    } catch (e) {
+      return target;
+    }
   }
 </script>
 

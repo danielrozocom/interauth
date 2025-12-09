@@ -28,6 +28,22 @@ export interface BrandConfig {
  * Agrega nuevos sistemas aquí según sea necesario
  */
 const BRAND_CONFIG: Record<string, BrandConfig> = {
+  // Local development (no system param needed)
+  local: {
+    name: "InterAuth Local",
+    primaryColor: "#35528C",
+    // Use a relative redirect in local config; the server/client will
+    // resolve this against the current origin so we don't hardcode ports.
+    redirectUrlAfterLogin: "/",
+    subtitle: "Login",
+  },
+  // The auth UI itself (used when ?system=auth or no system provided)
+  auth: {
+    name: "InterAuth",
+    primaryColor: "#35528C",
+    redirectUrlAfterLogin: "/",
+    subtitle: "Authentication",
+  },
   // InterPOS
   pos: {
     name: "InterPOS",
@@ -80,6 +96,9 @@ const BRAND_ALIASES: Record<string, string> = {
   pos: "pos",
   interapp: "app",
   app: "app",
+  local: "local",
+  dev: "local",
+  localhost: "local",
 };
 
 /**
@@ -159,4 +178,7 @@ export function getAvailableSystems(): string[] {
 /**
  * URL de redirección por defecto si no se especifica ninguna otra
  */
-export const DEFAULT_REDIRECT_URL = "https://pos.interfundeoms.edu.co";
+export const DEFAULT_REDIRECT_URL =
+  process.env.NODE_ENV === "development"
+    ? "/"
+    : "https://pos.interfundeoms.edu.co";

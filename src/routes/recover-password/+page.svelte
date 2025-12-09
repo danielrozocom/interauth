@@ -1,28 +1,18 @@
 ﻿<script lang="ts">
-  // Clean, single Svelte file for password recovery
   import type { PageData } from "./$types";
-  import PasswordInput from "$lib/components/PasswordInput.svelte";
   import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { createSupabaseBrowserClient } from "$lib/supabase/browserClient";
+  import { get } from "svelte/store";
   import { recoveryEmail } from "$lib/recoveryStore";
-
   import { enhance } from "$app/forms";
-  import type { ActionData } from "./$types";
 
   export let data: PageData;
 
-  const supabase = createSupabaseBrowserClient({});
-
-  type Step = "email" | "success" | "otp_sent";
+  type Step = "email" | "sent";
   let currentStep: Step = "email";
 
-  let isPasswordSubmitting = false;
-  $: isLoading = isPasswordSubmitting;
-
+  let isSubmitting = false;
   let email = "";
-  let password = "";
-  let confirmPassword = "";
   let infoMessage: string | null = null;
   let isError = false;
 
@@ -30,23 +20,16 @@
 
   onMount(() => {
     const params = new URLSearchParams(window.location.search);
-
-    // Check internal store first
-    if ($recoveryEmail) {
-      email = $recoveryEmail;
-      recoveryEmail.set(""); // Clear after use
-    } else {
-      const emailParam = params.get("email");
-      if (emailParam) {
-        email = emailParam;
-      }
+    // Restore email from store if available
+    const stored = get(recoveryEmail);
+    if (stored) {
+      email = stored;
     }
-
-    const url = new URL(`${window.location.origin}/callback`);
-    params.forEach((value, key) => {
-      url.searchParams.set(key, value);
-    });
-    redirectTo = url.toString();
+    // Build redirectTo param (used by the server action)
+    const systemParam = params.get("system");
+    if (systemParam) {
+      redirectTo = data.brandConfig?.redirectUrlAfterLogin || "";
+    }
   });
 
   let cooldownSeconds = 0;
@@ -73,15 +56,16 @@
   }
 
   function handleEnhance() {
-    isPasswordSubmitting = true;
+    isSubmitting = true;
     infoMessage = null;
     isError = false;
 
     return async ({ result }: { result: any }) => {
-      isPasswordSubmitting = false;
+      isSubmitting = false;
       if (result.type === "success") {
-        currentStep = "otp_sent";
+        currentStep = "sent";
         startCooldown();
+        recoveryEmail.set(email); // Save for later
       } else if (result.type === "failure") {
         isError = true;
         infoMessage = result.data?.error || "Error desconocido";
@@ -92,20 +76,12 @@
     };
   }
 
-  function resetFlow() {
-    currentStep = "email";
-    password = "";
-    confirmPassword = "";
-    infoMessage = null;
-    isError = false;
-  }
-
   function goToLogin() {
     const params = new URLSearchParams(window.location.search);
-    if (email) {
-      params.set("email", email);
-    }
-    goto(`/?${params.toString()}`);
+    if (email) recoveryEmail.set(email);
+    params.delete("email");
+    const qs = params.toString();
+    goto(`/${qs ? `?${qs}` : ""}`);
   }
 </script>
 
@@ -147,7 +123,7 @@
       <div class="card-body">
         {#if currentStep === "email"}
           <h2>Recuperar Contraseña</h2>
-          <p>Ingresa tu correo para recibir un código de verificación.</p>
+          <p>Ingresa tu correo para recibir un enlace de recuperación.</p>
           <img src="/favicon.svg" alt="Logo" class="top-logo" />
           <form
             class="form-group"
@@ -166,56 +142,29 @@
             <button
               type="submit"
               class="login-btn mb-2"
-              disabled={isLoading ||
+              disabled={isSubmitting ||
                 !validateEmail(email) ||
                 cooldownSeconds > 0}
             >
-              {#if isPasswordSubmitting}<span class="spinner"
-                ></span>{:else if cooldownSeconds > 0}Espera {cooldownSeconds}s{:else}Enviar
-                código{/if}
+              {#if isSubmitting}
+                <span class="spinner"></span>
+              {:else if cooldownSeconds > 0}
+                Espera {cooldownSeconds}s
+              {:else}
+                Enviar enlace
+              {/if}
             </button>
-            {#if infoMessage}<div
-                class={isError ? "error-message" : "info-message"}
-              >
+            {#if infoMessage}
+              <div class={isError ? "error-message" : "info-message"}>
                 {infoMessage}
-              </div>{/if}
-            <button type="button" class="link-btn" on:click={goToLogin}
-              >Volver al login</button
-            >
-          </form>
-        {:else if currentStep === "otp_sent"}
-          <h2>Revisa tu correo</h2>
-          <p>Te enviamos un código de verificación a:</p>
-          <p><strong>{email}</strong></p>
-          <img src="/favicon.svg" alt="Logo" class="top-logo" />
-          <form
-            class="form-group"
-            method="POST"
-            action="?/sendRecoveryLink"
-            use:enhance={handleEnhance}
-          >
-            <input type="hidden" name="redirectTo" value={redirectTo} />
-            <input type="hidden" name="email" value={email} />
-            <p
-              style="text-align:center; margin-bottom: 1rem; font-size: 0.9rem; color: #666;"
-            >
-              Haz clic en el enlace del correo para continuar con el proceso de
-              recuperación. Si no lo encuentras, revisa la carpeta de spam.
-            </p>
-            <button
-              type="submit"
-              class="link-btn"
-              disabled={isLoading || cooldownSeconds > 0}
-              style:opacity={cooldownSeconds > 0 ? "0.5" : "1"}
-              style:cursor={cooldownSeconds > 0 ? "not-allowed" : "pointer"}
-              >{#if cooldownSeconds > 0}Reenviar en {cooldownSeconds}s{:else}Reenviar
-                código{/if}</button
-            >
-            <button type="button" class="link-btn" on:click={goToLogin}
-              >Volver al login</button
-            >
+              </div>
+            {/if}
+            <button type="button" class="link-btn" on:click={goToLogin}>
+              Volver al login
+            </button>
           </form>
         {:else}
+          <!-- Email sent - show success message -->
           <div class="success-icon">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -225,26 +174,45 @@
               stroke="currentColor"
               width="80"
               height="80"
-              ><path
+            >
+              <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              /></svg
-            >
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
           </div>
-          <h2>¡Listo!</h2>
+          <h2>¡Revisa tu correo!</h2>
           <div class="form-group">
             <p>
-              Tu contraseña se actualizó correctamente.<br />Ahora puedes
-              iniciar sesión normalmente.
+              Enviamos un enlace de recuperación a:<br />
+              <strong>{email}</strong>
             </p>
-            {#if infoMessage}<div
-                class={isError ? "error-message" : "info-message"}
-              >
-                {infoMessage}
-              </div>{/if}<button on:click={goToLogin} class="login-btn"
-              >Ir al Login</button
+            <p class="hint">
+              Haz clic en el enlace del correo para establecer una nueva
+              contraseña.
+            </p>
+
+            <button
+              type="button"
+              class="link-btn"
+              disabled={cooldownSeconds > 0}
+              on:click={() => {
+                currentStep = "email";
+              }}
+              style:opacity={cooldownSeconds > 0 ? "0.5" : "1"}
+              style:cursor={cooldownSeconds > 0 ? "not-allowed" : "pointer"}
             >
+              {#if cooldownSeconds > 0}
+                Reenviar en {cooldownSeconds}s
+              {:else}
+                Reenviar enlace
+              {/if}
+            </button>
+
+            <button type="button" class="link-btn" on:click={goToLogin}>
+              Volver al login
+            </button>
           </div>
         {/if}
       </div>
@@ -333,8 +301,12 @@
     color: #111827;
   }
   .card p {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     text-align: center;
+  }
+  .hint {
+    font-size: 0.9rem;
+    color: #6b7280;
   }
   .top-logo {
     display: block;
@@ -379,6 +351,7 @@
       transform 0.08s,
       box-shadow 0.12s;
     cursor: pointer;
+    text-decoration: none;
   }
   .login-btn:hover {
     filter: brightness(0.95);
@@ -461,7 +434,7 @@
   .success-icon {
     display: flex;
     justify-content: center;
-    color: #10b981;
+    color: var(--primary-color, #35528c);
     margin-bottom: 1rem;
   }
   .mb-2 {
