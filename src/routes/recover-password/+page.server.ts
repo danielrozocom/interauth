@@ -40,23 +40,35 @@ export const actions: Actions = {
 
     const supabase = createSupabaseServerClient({ request, cookies });
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: redirectTo || `${url.origin}/callback`,
+    // Verificación ligera: usar signInWithOtp para comprobar si el usuario existe
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
     });
 
-    if (error) {
-      // Check if the error indicates the email is not registered
+    if (otpError) {
+      // Capturar errores de usuario no encontrado
       if (
-        error.message.toLowerCase().includes("user not found") ||
-        error.message.toLowerCase().includes("invalid email") ||
-        error.message.toLowerCase().includes("email not found")
+        otpError.message.toLowerCase().includes("user not found") ||
+        otpError.message.toLowerCase().includes("user does not exist") ||
+        otpError.message
+          .toLowerCase()
+          .includes("not allowed to log in with otp")
       ) {
         return fail(400, {
           error: "El correo no está registrado",
         });
       } else {
-        return fail(400, { error: error.message });
+        return fail(400, { error: otpError.message });
       }
+    }
+
+    // Si la verificación OTP fue exitosa, el usuario existe, proceder con envío del enlace de recuperación
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: redirectTo || `${url.origin}/callback`,
+    });
+
+    if (error) {
+      return fail(400, { error: error.message });
     }
 
     return { success: true };

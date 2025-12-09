@@ -89,7 +89,8 @@ export const load: PageServerLoad = async ({ url, locals }) => {
   // 2. Si NO hay código, verificar si ya hay sesión activa
   // Para redirigir automáticamente si el usuario entra a / estando logueado
   const { session } = await locals.safeGetSession();
-  if (session && !code) {
+  const type = url.searchParams.get("type");
+  if (session && !code && type !== "recovery") {
     const redirectTo =
       url.searchParams.get("redirectTo") || url.searchParams.get("redirect_to");
 

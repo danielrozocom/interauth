@@ -148,12 +148,7 @@
         {#if currentStep === "email"}
           <h2>Recuperar Contraseña</h2>
           <p>Ingresa tu correo para recibir un enlace de recuperación.</p>
-          <img
-            src="/favicon.svg"
-            alt="Logo"
-            class="top-logo"
-            style:display={currentStep === "success" ? "none" : "block"}
-          />
+          <img src="/favicon.svg" alt="Logo" class="top-logo" />
           <form
             class="form-group"
             method="POST"

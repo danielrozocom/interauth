@@ -33,6 +33,15 @@
     if (emailParam) {
       email = emailParam;
     }
+
+    // Handle recovery flow
+    const typeParam = params.get("type");
+    if (typeParam === "recovery" && data.session && currentStep === "login") {
+      currentStep = "new_password";
+      email = data.session.user.email || "";
+      infoMessage = "Por favor establece una nueva contraseña.";
+      isError = false;
+    }
   });
 
   // Cooldown logic
@@ -221,7 +230,27 @@
 
       if (error) throw error;
 
-      // Cerrar sesión para seguridad
+      // Check if this is a recovery flow
+      const urlParams = new URLSearchParams(window.location.search);
+      const isRecovery = urlParams.get("type") === "recovery";
+      const redirectTo =
+        urlParams.get("redirectTo") || urlParams.get("redirect_to");
+
+      if (isRecovery) {
+        // For recovery, redirect to the intended destination after password update
+        let target = "/";
+        if (redirectTo) {
+          target = redirectTo;
+        } else if (data?.brandConfig?.redirectUrlAfterLogin) {
+          target = data.brandConfig.redirectUrlAfterLogin;
+        } else if ((data as any)?.defaultRedirect) {
+          target = (data as any).defaultRedirect;
+        }
+        window.location.href = target;
+        return;
+      }
+
+      // For other cases, sign out for security
       await (data as any).supabase.auth.signOut();
 
       // Éxito Final
@@ -559,7 +588,7 @@
 
           <button
             class="link-btn"
-            disabled={loading || cooldownSeconds > 0}
+            disabled={isLoading || cooldownSeconds > 0}
             style:opacity={cooldownSeconds > 0 ? "0.5" : "1"}
             style:cursor={cooldownSeconds > 0 ? "not-allowed" : "pointer"}
             on:click={sendOtpCode}

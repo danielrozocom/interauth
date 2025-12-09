@@ -3,6 +3,8 @@ import { DEFAULT_REDIRECT_URL, resolveBrand } from "$lib/brandConfig";
 
 export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
   const code = url.searchParams.get("code");
+  const accessToken = url.searchParams.get("access_token");
+  const refreshToken = url.searchParams.get("refresh_token");
   const next = url.searchParams.get("next");
   const system = url.searchParams.get("system");
   const type = url.searchParams.get("type"); // recovery, signup, etc.
@@ -18,18 +20,36 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
     isRecovery: type === "recovery",
   };
 
-  // 1. Validar si hay código
-  if (!code) {
-    result.message = "No se recibió ningún código de autenticación.";
-    return result;
+  // 1. Validar si hay código o tokens
+  if (type === "recovery") {
+    if (!accessToken || !refreshToken) {
+      result.message = "Tokens de recuperación no encontrados en la URL.";
+      return result;
+    }
+  } else {
+    if (!code) {
+      result.message = "No se recibió ningún código de autenticación.";
+      return result;
+    }
   }
 
   try {
-    // 2. Intercambiar el código por sesión
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    // 2. Establecer sesión
+    let error;
+    if (type === "recovery") {
+      const { error: setError } = await supabase.auth.setSession({
+        access_token: accessToken!,
+        refresh_token: refreshToken!,
+      });
+      error = setError;
+    } else {
+      const { error: exchangeError } =
+        await supabase.auth.exchangeCodeForSession(code!);
+      error = exchangeError;
+    }
 
     if (error) {
-      console.warn("Error en exchangeCodeForSession:", error.message);
+      console.warn("Error al establecer sesión:", error.message);
       // Mensaje amigable, NO redirigimos, NO error 500
       result.message =
         "El enlace no es válido o ha expirado. Por favor solicita uno nuevo.";
@@ -47,19 +67,23 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
       return result;
     }
 
-    // 4. Éxito: Preparar URL de destino (interna o permitida)
+    // 4. Éxito: Preparar URL de destino
     result.connected = true;
     result.message = "Verificado correctamente. Redirigiendo...";
 
     // Lógica de destino actualizada
     if (type === "recovery") {
+      // Para recovery, redirigir a la página principal con indicador de recovery
       const params = new URLSearchParams();
       params.set("type", "recovery");
-      params.set("code_valid", "true");
 
       // Preserve all other parameters
       url.searchParams.forEach((value, key) => {
-        if (!["code", "type", "next"].includes(key)) {
+        if (
+          !["code", "access_token", "refresh_token", "type", "next"].includes(
+            key
+          )
+        ) {
           params.set(key, value);
         }
       });
@@ -79,6 +103,7 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 
     console.log("--- Callback Redirect Debug ---");
     console.log("Current URL:", url.toString());
+    console.log("Type:", type);
     console.log("Redirect To Param:", redirectTo);
     console.log("Final Redirect URL:", result.redirectUrl);
     console.log("-------------------------------");
