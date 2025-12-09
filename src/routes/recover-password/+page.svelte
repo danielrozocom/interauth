@@ -11,11 +11,10 @@
   import type { ActionData } from "./$types";
 
   export let data: PageData;
-  export let form: ActionData;
 
   const supabase = createSupabaseBrowserClient({});
 
-  type Step = "email" | "otp" | "new_password" | "success" | "otp_sent";
+  type Step = "email" | "success" | "otp_sent";
   let currentStep: Step = "email";
 
   let isPasswordSubmitting = false;
@@ -24,7 +23,6 @@
   let email = "";
   let password = "";
   let confirmPassword = "";
-  let otpCode = "";
   let infoMessage: string | null = null;
   let isError = false;
 
@@ -94,98 +92,10 @@
     };
   }
 
-  // Deprecated OTP functions kept but unused in new flow
-  async function verifyOtpCode() {
-    isPasswordSubmitting = true;
-    infoMessage = null;
-    isError = false;
-
-    if (!otpCode || otpCode.length < 6) {
-      infoMessage = "El código debe tener 6 dígitos.";
-      isError = true;
-      isPasswordSubmitting = false;
-      return;
-    }
-
-    try {
-      const { data: sessionData, error } = await supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: otpCode.trim(),
-        type: "email",
-      });
-      if (error) throw error;
-      currentStep = "new_password";
-      password = "";
-      confirmPassword = "";
-    } catch (err: any) {
-      console.error("Error verificando OTP:", err);
-      infoMessage = "El código no es válido o ya expiró. Pide uno nuevo.";
-      isError = true;
-    } finally {
-      isPasswordSubmitting = false;
-    }
-  }
-
-  async function updatePasswordFinal() {
-    isPasswordSubmitting = true;
-    infoMessage = null;
-    isError = false;
-
-    if (!password || password.length < 6) {
-      infoMessage = "La contraseña debe tener al menos 6 caracteres.";
-      isError = true;
-      isPasswordSubmitting = false;
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      infoMessage = "Las contraseñas no coinciden.";
-      isError = true;
-      isPasswordSubmitting = false;
-      return;
-    }
-
-    try {
-      const { data: probeData } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (probeData?.session) {
-        infoMessage = "La nueva contraseña no puede ser igual a la actual.";
-        isError = true;
-        isPasswordSubmitting = false;
-        return;
-      }
-    } catch {
-      // ignore
-    }
-
-    try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
-      await supabase.auth.signOut();
-      currentStep = "success";
-    } catch (err: any) {
-      console.error("Error actualizando password:", err);
-      if (
-        err?.message &&
-        err.message.toLowerCase().includes("same as current")
-      ) {
-        infoMessage = "La nueva contraseña no puede ser igual a la actual.";
-      } else {
-        infoMessage = "No se pudo actualizar la contraseña. Intenta de nuevo.";
-      }
-      isError = true;
-    } finally {
-      isPasswordSubmitting = false;
-    }
-  }
-
   function resetFlow() {
     currentStep = "email";
     password = "";
     confirmPassword = "";
-    otpCode = "";
     infoMessage = null;
     isError = false;
   }
@@ -237,7 +147,7 @@
       <div class="card-body">
         {#if currentStep === "email"}
           <h2>Recuperar Contraseña</h2>
-          <p>Ingresa tu correo para recibir un código de recuperación.</p>
+          <p>Ingresa tu correo para recibir un enlace de recuperación.</p>
           <img
             src="/favicon.svg"
             alt="Logo"
@@ -267,7 +177,7 @@
             >
               {#if isPasswordSubmitting}<span class="spinner"
                 ></span>{:else if cooldownSeconds > 0}Espera {cooldownSeconds}s{:else}Enviar
-                código{/if}
+                enlace{/if}
             </button>
             {#if infoMessage}<div
                 class={isError ? "error-message" : "info-message"}
@@ -280,7 +190,7 @@
           </form>
         {:else if currentStep === "otp_sent"}
           <h2>Revisa tu correo</h2>
-          <p>Hemos enviado un código de recuperación a:</p>
+          <p>Hemos enviado un enlace de recuperación a:</p>
           <p><strong>{email}</strong></p>
           <img src="/favicon.svg" alt="Logo" class="top-logo" />
           <form
@@ -294,14 +204,9 @@
             <p
               style="text-align:center; margin-bottom: 1rem; font-size: 0.9rem; color: #666;"
             >
-              Ingresa el código del correo para restablecer tu contraseña. Si no
-              lo encuentras, revisa la carpeta de spam.
+              Haz clic en el enlace del correo para restablecer tu contraseña.
+              Si no lo encuentras, revisa la carpeta de spam.
             </p>
-            <button
-              type="button"
-              class="login-btn mb-2"
-              on:click={() => (currentStep = "otp")}>Ingresar código</button
-            >
             <button
               type="submit"
               class="link-btn"
@@ -309,88 +214,12 @@
               style:opacity={cooldownSeconds > 0 ? "0.5" : "1"}
               style:cursor={cooldownSeconds > 0 ? "not-allowed" : "pointer"}
               >{#if cooldownSeconds > 0}Reenviar en {cooldownSeconds}s{:else}Reenviar
-                código{/if}</button
+                enlace{/if}</button
             >
             <button type="button" class="link-btn" on:click={goToLogin}
               >Volver al login</button
             >
           </form>
-        {:else if currentStep === "otp"}
-          <h2>Verificar Código</h2>
-          <p>Ingresa el código enviado a <strong>{email}</strong></p>
-          <img
-            src="/favicon.svg"
-            alt="Logo"
-            class="top-logo"
-            style:display={currentStep === "success" ? "none" : "block"}
-          />
-          <div class="form-group">
-            <input
-              type="tel"
-              placeholder="Código de 6 dígitos"
-              value={otpCode}
-              on:input={(e) =>
-                (otpCode = e.currentTarget.value.replace(/\D/g, ""))}
-              class="input otp-input"
-              maxlength="6"
-            />
-            <button
-              on:click={verifyOtpCode}
-              class="login-btn mb-2"
-              disabled={isLoading || otpCode.length < 6}
-              >{#if isPasswordSubmitting}<span class="spinner"
-                ></span>{:else}Verificar código{/if}</button
-            >
-            {#if infoMessage}<div
-                class={isError ? "error-message" : "info-message"}
-              >
-                {infoMessage}
-              </div>{/if}
-            <button
-              class="link-btn"
-              disabled={isLoading || cooldownSeconds > 0}
-              style:opacity={cooldownSeconds > 0 ? "0.5" : "1"}
-              style:cursor={cooldownSeconds > 0 ? "not-allowed" : "pointer"}
-              on:click={sendOtpCode}
-              >{#if cooldownSeconds > 0}Reenviar en {cooldownSeconds}s{:else}Reenviar
-                código{/if}</button
-            >
-          </div>
-        {:else if currentStep === "new_password"}
-          <h2>Nueva Contraseña</h2>
-          <p>Ingresa tu nueva contraseña.</p>
-          <img
-            src="/favicon.svg"
-            alt="Logo"
-            class="top-logo"
-            style:display={currentStep === "success" ? "none" : "block"}
-          />
-          <div class="form-group">
-            <PasswordInput
-              bind:value={password}
-              placeholder="Nueva contraseña"
-              disabled={isLoading}
-            />
-            <PasswordInput
-              bind:value={confirmPassword}
-              placeholder="Confirmar contraseña"
-              disabled={isLoading}
-            />
-            <button
-              on:click={updatePasswordFinal}
-              class="login-btn mb-2"
-              disabled={isLoading ||
-                password.length < 6 ||
-                password !== confirmPassword}
-              >{#if isPasswordSubmitting}<span class="spinner"
-                ></span>{:else}Cambiar contraseña{/if}</button
-            >
-            {#if infoMessage}<div
-                class={isError ? "error-message" : "info-message"}
-              >
-                {infoMessage}
-              </div>{/if}
-          </div>
         {:else}
           <div class="success-icon">
             <svg
@@ -599,11 +428,6 @@
     outline: none;
     border-color: #35528c;
     box-shadow: 0 6px 18px rgba(53, 82, 140, 0.06);
-  }
-  .otp-input {
-    letter-spacing: 4px;
-    font-size: 1.2rem;
-    text-align: center;
   }
   .form-group {
     display: flex;
