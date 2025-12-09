@@ -38,7 +38,12 @@ export const actions: Actions = {
   sendRecoveryLink: async ({ request, url, cookies }) => {
     const formData = await request.formData();
     const email = formData.get("email") as string;
-    const originalRedirectTo = formData.get("redirectTo") as string;
+    const redirectTo = formData.get("redirectTo") as string;
+
+    // Preserve `system` from the original URL when building the
+    // email redirect that Supabase will embed in the confirmation link.
+    // Only include it when present; otherwise keep existing behaviour.
+    const system = url.searchParams.get("system");
 
     if (!email) {
       return fail(400, { error: "El correo es obligatorio." });
@@ -49,78 +54,74 @@ export const actions: Actions = {
       return fail(400, { error: "Ingresa un correo válido." });
     }
 
+    // En vez de depender del admin client (service role) que a veces no está
+    // disponible en dev, delegamos en la API de Supabase y mapeamos errores
+    // comunes a mensajes amigables.
     const supabase = createSupabaseServerClient({ request, cookies });
 
-    // Build the redirect URL for the password reset email
-    // This should point to /reset-password with preserved parameters
-    const system = url.searchParams.get("system");
-    const resetPasswordUrl = new URL(`${url.origin}/reset-password`);
-    if (system) {
-      resetPasswordUrl.searchParams.set("system", system);
-    }
-    if (originalRedirectTo) {
-      resetPasswordUrl.searchParams.set("redirect_to", originalRedirectTo);
-    }
-
     try {
-      // SECURITY: Do NOT validate if email exists before sending recovery link.
-      // This prevents user enumeration attacks. Always show neutral response.
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        email.trim(),
-        {
-          redirectTo: resetPasswordUrl.toString(),
-        }
-      );
+      // Determine the auth origin to build the reset-password URL. Prefer
+      // a public env var if available, otherwise fall back to the current
+      // request origin. This mirrors the runtime config used elsewhere.
+      const AUTH_ORIGIN =
+        process.env.PUBLIC_AUTH_ORIGIN ||
+        process.env.VITE_AUTH_ORIGIN ||
+        url.origin;
+
+      let emailRedirectTo: string;
+      if (system) {
+        // Build a reset-password URL that explicitly includes the `system`
+        // param and the original `redirect_to` so Supabase will embed them
+        // into the ConfirmationURL it sends by email.
+        const params = new URLSearchParams();
+        params.set("system", system);
+        if (redirectTo) params.set("redirect_to", redirectTo);
+
+        emailRedirectTo = `${AUTH_ORIGIN.replace(
+          /\/$/,
+          ""
+        )}/reset-password?${params.toString()}`;
+      } else {
+        // Preserve previous behaviour when `system` is absent.
+        emailRedirectTo = redirectTo || `${url.origin}/callback`;
+      }
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        type: "recovery" as any,
+        options: {
+          shouldCreateUser: false,
+          emailRedirectTo,
+        },
+      });
 
       if (error) {
-        // Log the full error for debugging, but NEVER expose user existence to UI
-        console.error("[Recovery] Error details (internal only):", {
-          message: error.message,
-          status: (error as any).status,
-          code: (error as any).code,
-          email: email, // Log email for internal debugging
-        });
-
+        console.error("Error al enviar OTP de recuperación:", error);
         const msg = (error.message || "").toLowerCase();
-        const status = (error as any).status;
-        const code = (error as any).code;
-
-        // Handle rate limit error - status 429 or specific code
-        // This is safe to expose since it doesn't reveal user existence
         if (
-          status === 429 ||
-          code === "over_email_send_rate_limit" ||
-          msg.includes("rate limit") ||
-          msg.includes("you can only request this after")
+          msg.includes("user not found") ||
+          msg.includes("no user") ||
+          msg.includes("not found") ||
+          msg.includes("signups not allowed")
         ) {
-          console.log("[Recovery] Rate limit hit for email:", email);
-          return fail(429, {
-            error:
-              "Has enviado varias solicitudes de recuperación. Prueba nuevamente en unos momentos.",
-            isRateLimit: true,
+          return fail(400, {
+            error: "No encontramos una cuenta asociada a este correo.",
           });
         }
 
-        // For ALL other errors (including "user not found", "invalid email", etc.)
-        // show the SAME neutral success message to prevent user enumeration
-        // The actual error is already logged above for debugging
-        console.log("[Recovery] Returning neutral response for:", email);
-      } else {
-        console.log("[Recovery] Reset email sent successfully to:", email);
+        return fail(400, {
+          error:
+            "No pudimos enviar el código. Inténtalo de nuevo en unos minutos.",
+        });
       }
-
-      // SECURITY: Always return success with neutral message
-      // This prevents attackers from discovering which emails are registered
     } catch (err) {
-      // Network or server error - this is safe to show as it doesn't reveal user info
-      console.error("[Recovery] Unexpected error:", err);
-      return fail(500, {
+      console.error("Error inesperado al enviar OTP de recuperación:", err);
+      return fail(400, {
         error:
-          "Ocurrió un error al procesar tu solicitud. Inténtalo de nuevo más tarde.",
+          "No fue posible enviar el código en este momento. Por favor inténtalo de nuevo en unos minutos.",
       });
     }
 
-    // Always return success with neutral message (handled in frontend)
     return { success: true };
   },
 };

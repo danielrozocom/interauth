@@ -52,10 +52,38 @@
       }, 2000);
     } catch (err: any) {
       console.error("Error actualizando contraseña:", err);
-      if (err.message?.toLowerCase().includes("same as")) {
-        infoMessage = "La nueva contraseña no puede ser igual a la actual.";
-      } else {
-        infoMessage = "No se pudo actualizar la contraseña. Intenta de nuevo.";
+      const msg = (err.message || "").toLowerCase();
+
+      // Same password error - various phrases Supabase might return
+      if (
+        msg.includes("same as") ||
+        msg.includes("different from") ||
+        msg.includes("must be different") ||
+        msg.includes("should be different") ||
+        msg.includes("cannot be the same")
+      ) {
+        infoMessage = "La nueva contraseña no puede ser igual a la anterior.";
+      }
+      // Password validation/complexity errors
+      else if (
+        msg.includes("too short") ||
+        msg.includes("too weak") ||
+        msg.includes("at least") ||
+        msg.includes("minimum") ||
+        msg.includes("complexity") ||
+        msg.includes("requirements") ||
+        msg.includes("uppercase") ||
+        msg.includes("lowercase") ||
+        msg.includes("number") ||
+        msg.includes("special character")
+      ) {
+        infoMessage =
+          "La nueva contraseña no cumple los requisitos de seguridad.";
+      }
+      // Generic fallback
+      else {
+        infoMessage =
+          "No pudimos actualizar tu contraseña. Intenta nuevamente.";
       }
       isError = true;
     } finally {
@@ -78,8 +106,13 @@
 
 <div class="login-page">
   <div class="card">
-    <div class="brand" style:--primary-color={data.brandConfig?.primaryColor || "#35528c"}>
-      {#if data.brandConfig?.name}<h1>{data.brandConfig.name}</h1>{:else}<h1>InterAuth</h1>{/if}
+    <div
+      class="brand"
+      style:--primary-color={data.brandConfig?.primaryColor || "#35528c"}
+    >
+      {#if data.brandConfig?.name}<h1>{data.brandConfig.name}</h1>{:else}<h1>
+          InterAuth
+        </h1>{/if}
     </div>
     <div class="card-body">
       {#if !data.valid}
