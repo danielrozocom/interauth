@@ -4,6 +4,7 @@
   import { onMount, onDestroy } from "svelte";
   import { goto } from "$app/navigation";
   import { createSupabaseBrowserClient } from "$lib/supabase/browserClient";
+  import { recoveryEmail } from "$lib/recoveryStore";
 
   export let data: PageData;
 
@@ -25,6 +26,14 @@
   let otpCode = "";
   let infoMessage: string | null = null;
   let isError = false;
+
+  onMount(() => {
+    const params = new URLSearchParams(window.location.search);
+    const emailParam = params.get("email");
+    if (emailParam) {
+      email = emailParam;
+    }
+  });
 
   // Cooldown logic
   let cooldownSeconds = 0;
@@ -422,6 +431,12 @@
             disabled={isLoading}
             on:click={() => {
               const params = new URLSearchParams(window.location.search);
+              // Ensure email is NOT passed in URL
+              params.delete("email");
+
+              if (email) {
+                recoveryEmail.set(email);
+              }
               goto(`/recover-password?${params.toString()}`);
             }}
           >

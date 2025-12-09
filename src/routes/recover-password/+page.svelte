@@ -2,15 +2,20 @@
   // Clean, single Svelte file for password recovery
   import type { PageData } from "./$types";
   import PasswordInput from "$lib/components/PasswordInput.svelte";
-  import { onDestroy } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { createSupabaseBrowserClient } from "$lib/supabase/browserClient";
+  import { recoveryEmail } from "$lib/recoveryStore";
+
+  import { enhance } from "$app/forms";
+  import type { ActionData } from "./$types";
 
   export let data: PageData;
+  export let form: ActionData;
 
   const supabase = createSupabaseBrowserClient({});
 
-  type Step = "email" | "otp" | "new_password" | "success" | "link_sent";
+  type Step = "email" | "otp" | "new_password" | "success" | "otp_sent";
   let currentStep: Step = "email";
 
   let isPasswordSubmitting = false;
@@ -22,6 +27,29 @@
   let otpCode = "";
   let infoMessage: string | null = null;
   let isError = false;
+
+  let redirectTo = "";
+
+  onMount(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    // Check internal store first
+    if ($recoveryEmail) {
+      email = $recoveryEmail;
+      recoveryEmail.set(""); // Clear after use
+    } else {
+      const emailParam = params.get("email");
+      if (emailParam) {
+        email = emailParam;
+      }
+    }
+
+    const url = new URL(`${window.location.origin}/callback`);
+    params.forEach((value, key) => {
+      url.searchParams.set(key, value);
+    });
+    redirectTo = url.toString();
+  });
 
   let cooldownSeconds = 0;
   let timer: any;
@@ -46,49 +74,24 @@
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
   }
 
-  async function sendRecoveryLink() {
+  function handleEnhance() {
     isPasswordSubmitting = true;
     infoMessage = null;
     isError = false;
 
-    if (!validateEmail(email)) {
-      infoMessage = "Ingresa un email válido.";
-      isError = true;
+    return async ({ result }: { result: any }) => {
       isPasswordSubmitting = false;
-      return;
-    }
-
-    if (cooldownSeconds > 0) return;
-
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const redirectTo = new URL(`${window.location.origin}/callback`);
-      params.forEach((value, key) => {
-        redirectTo.searchParams.set(key, value);
-      });
-
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        email.trim(),
-        {
-          redirectTo: redirectTo.toString(),
-        }
-      );
-
-      if (error) throw error;
-      currentStep = "link_sent";
-      startCooldown();
-    } catch (err: any) {
-      console.error("Error enviando link:", err);
-      if (err?.message && err.message.includes("Signups not allowed for otp")) {
-        infoMessage = "No pudimos encontrar una cuenta con este correo.";
-      } else {
-        infoMessage =
-          err?.message || "No pudimos enviar el enlace. Intenta de nuevo.";
+      if (result.type === "success") {
+        currentStep = "otp_sent";
+        startCooldown();
+      } else if (result.type === "failure") {
+        isError = true;
+        infoMessage = result.data?.error || "Error desconocido";
+      } else if (result.type === "error") {
+        isError = true;
+        infoMessage = "Error del servidor";
       }
-      isError = true;
-    } finally {
-      isPasswordSubmitting = false;
-    }
+    };
   }
 
   // Deprecated OTP functions kept but unused in new flow
@@ -189,6 +192,9 @@
 
   function goToLogin() {
     const params = new URLSearchParams(window.location.search);
+    if (email) {
+      params.set("email", email);
+    }
     goto(`/?${params.toString()}`);
   }
 </script>
@@ -231,22 +237,29 @@
       <div class="card-body">
         {#if currentStep === "email"}
           <h2>Recuperar Contraseña</h2>
-          <p>Ingresa tu correo para recibir un enlace de recuperación.</p>
+          <p>Ingresa tu correo para recibir un código de recuperación.</p>
           <img
             src="/favicon.svg"
             alt="Logo"
             class="top-logo"
             style:display={currentStep === "success" ? "none" : "block"}
           />
-          <div class="form-group">
+          <form
+            class="form-group"
+            method="POST"
+            action="?/sendRecoveryLink"
+            use:enhance={handleEnhance}
+          >
+            <input type="hidden" name="redirectTo" value={redirectTo} />
             <input
               type="email"
+              name="email"
               placeholder="Correo electrónico"
               bind:value={email}
               class="input"
             />
             <button
-              on:click={sendRecoveryLink}
+              type="submit"
               class="login-btn mb-2"
               disabled={isLoading ||
                 !validateEmail(email) ||
@@ -254,43 +267,54 @@
             >
               {#if isPasswordSubmitting}<span class="spinner"
                 ></span>{:else if cooldownSeconds > 0}Espera {cooldownSeconds}s{:else}Enviar
-                enlace{/if}
+                código{/if}
             </button>
             {#if infoMessage}<div
                 class={isError ? "error-message" : "info-message"}
               >
                 {infoMessage}
               </div>{/if}
-            <button class="link-btn" on:click={goToLogin}
+            <button type="button" class="link-btn" on:click={goToLogin}
               >Volver al login</button
             >
-          </div>
-        {:else if currentStep === "link_sent"}
+          </form>
+        {:else if currentStep === "otp_sent"}
           <h2>Revisa tu correo</h2>
-          <p>
-            Hemos enviado un enlace de recuperación a <strong>{email}</strong>
-          </p>
+          <p>Hemos enviado un código de recuperación a:</p>
+          <p><strong>{email}</strong></p>
           <img src="/favicon.svg" alt="Logo" class="top-logo" />
-          <div class="form-group">
+          <form
+            class="form-group"
+            method="POST"
+            action="?/sendRecoveryLink"
+            use:enhance={handleEnhance}
+          >
+            <input type="hidden" name="redirectTo" value={redirectTo} />
+            <input type="hidden" name="email" value={email} />
             <p
               style="text-align:center; margin-bottom: 1rem; font-size: 0.9rem; color: #666;"
             >
-              Haz clic en el enlace del correo para restablecer tu contraseña.
-              Si no lo encuentras, revisa la carpeta de spam.
+              Ingresa el código del correo para restablecer tu contraseña. Si no
+              lo encuentras, revisa la carpeta de spam.
             </p>
             <button
+              type="button"
+              class="login-btn mb-2"
+              on:click={() => (currentStep = "otp")}>Ingresar código</button
+            >
+            <button
+              type="submit"
               class="link-btn"
               disabled={isLoading || cooldownSeconds > 0}
               style:opacity={cooldownSeconds > 0 ? "0.5" : "1"}
               style:cursor={cooldownSeconds > 0 ? "not-allowed" : "pointer"}
-              on:click={sendRecoveryLink}
               >{#if cooldownSeconds > 0}Reenviar en {cooldownSeconds}s{:else}Reenviar
-                enlace{/if}</button
+                código{/if}</button
             >
-            <button class="link-btn" on:click={goToLogin}
+            <button type="button" class="link-btn" on:click={goToLogin}
               >Volver al login</button
             >
-          </div>
+          </form>
         {:else if currentStep === "otp"}
           <h2>Verificar Código</h2>
           <p>Ingresa el código enviado a <strong>{email}</strong></p>

@@ -1,5 +1,25 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { env } from "$env/dynamic/private";
+
+export function createSupabaseAdminClient() {
+  const supabaseUrl = env.PUBLIC_SUPABASE_URL || env.SUPABASE_URL;
+  const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error(
+      "❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for admin client"
+    );
+    throw new Error("Server configuration error: Missing admin keys");
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
 
 export function createSupabaseServerClient({
   request,
