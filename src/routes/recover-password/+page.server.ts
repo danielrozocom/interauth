@@ -5,7 +5,10 @@ import {
   hasSupabaseReservedParam,
   isSystemValid,
 } from "$lib/brandConfig";
-import { createSupabaseServerClient } from "$lib/supabase/serverClient";
+import {
+  createSupabaseServerClient,
+  createSupabaseAdminClient,
+} from "$lib/supabase/serverClient";
 
 export const load: PageServerLoad = async ({ url }) => {
   const system = url.searchParams.get("system");
@@ -38,37 +41,37 @@ export const actions: Actions = {
       return fail(400, { error: "El correo es obligatorio." });
     }
 
-    const supabase = createSupabaseServerClient({ request, cookies });
+    // Paso 1: Validar que el usuario exista usando el cliente admin
+    try {
+      const adminClient = createSupabaseAdminClient();
+      const { data: userData, error: userError } =
+        await adminClient.auth.admin.getUserByEmail(email.trim());
 
-    // Verificación ligera: usar signInWithOtp para comprobar si el usuario existe
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-    });
-
-    if (otpError) {
-      // Capturar errores de usuario no encontrado
-      if (
-        otpError.message.toLowerCase().includes("user not found") ||
-        otpError.message.toLowerCase().includes("user does not exist") ||
-        otpError.message
-          .toLowerCase()
-          .includes("not allowed to log in with otp")
-      ) {
+      if (userError || !userData?.user) {
         return fail(400, {
-          error: "El correo no está registrado",
+          error: "No encontramos una cuenta asociada a este correo.",
         });
-      } else {
-        return fail(400, { error: otpError.message });
       }
+    } catch (error) {
+      console.error("Error al verificar usuario:", error);
+      return fail(500, {
+        error: "Error al verificar el correo. Intenta nuevamente.",
+      });
     }
 
-    // Si la verificación OTP fue exitosa, el usuario existe, proceder con envío del enlace de recuperación
+    // Paso 2: Si el usuario existe, enviar el email de recuperación
+    const supabase = createSupabaseServerClient({ request, cookies });
+
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: redirectTo || `${url.origin}/callback`,
     });
 
     if (error) {
-      return fail(400, { error: error.message });
+      console.error("Error al enviar email de recuperación:", error);
+      return fail(400, {
+        error:
+          "No se pudo enviar el código de verificación. Intenta nuevamente.",
+      });
     }
 
     return { success: true };

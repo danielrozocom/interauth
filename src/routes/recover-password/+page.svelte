@@ -147,7 +147,7 @@
       <div class="card-body">
         {#if currentStep === "email"}
           <h2>Recuperar Contraseña</h2>
-          <p>Ingresa tu correo para recibir un enlace de recuperación.</p>
+          <p>Ingresa tu correo para recibir un código de verificación.</p>
           <img src="/favicon.svg" alt="Logo" class="top-logo" />
           <form
             class="form-group"
@@ -172,7 +172,7 @@
             >
               {#if isPasswordSubmitting}<span class="spinner"
                 ></span>{:else if cooldownSeconds > 0}Espera {cooldownSeconds}s{:else}Enviar
-                enlace{/if}
+                código{/if}
             </button>
             {#if infoMessage}<div
                 class={isError ? "error-message" : "info-message"}
@@ -185,7 +185,7 @@
           </form>
         {:else if currentStep === "otp_sent"}
           <h2>Revisa tu correo</h2>
-          <p>Hemos enviado un enlace de recuperación a:</p>
+          <p>Te enviamos un código de verificación a:</p>
           <p><strong>{email}</strong></p>
           <img src="/favicon.svg" alt="Logo" class="top-logo" />
           <form
@@ -199,8 +199,8 @@
             <p
               style="text-align:center; margin-bottom: 1rem; font-size: 0.9rem; color: #666;"
             >
-              Haz clic en el enlace del correo para restablecer tu contraseña.
-              Si no lo encuentras, revisa la carpeta de spam.
+              Haz clic en el enlace del correo para continuar con el proceso de
+              recuperación. Si no lo encuentras, revisa la carpeta de spam.
             </p>
             <button
               type="submit"
@@ -209,7 +209,7 @@
               style:opacity={cooldownSeconds > 0 ? "0.5" : "1"}
               style:cursor={cooldownSeconds > 0 ? "not-allowed" : "pointer"}
               >{#if cooldownSeconds > 0}Reenviar en {cooldownSeconds}s{:else}Reenviar
-                enlace{/if}</button
+                código{/if}</button
             >
             <button type="button" class="link-btn" on:click={goToLogin}
               >Volver al login</button
