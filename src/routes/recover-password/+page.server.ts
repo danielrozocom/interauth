@@ -86,14 +86,15 @@ export const actions: Actions = {
         emailRedirectTo = redirectTo || `${url.origin}/callback`;
       }
 
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        type: "recovery" as any,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo,
-        },
-      });
+      // Use the explicit password recovery API so Supabase sends the
+      // official password recovery template (NOT a magic link login).
+      // This ensures the email contains the proper reset flow.
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        {
+          redirectTo: emailRedirectTo,
+        }
+      );
 
       if (error) {
         console.error("Error al enviar OTP de recuperación:", error);

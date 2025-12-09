@@ -35,6 +35,33 @@
     }
 
     try {
+      // Ensure we have an authenticated session for the recovery token.
+      // We avoid treating this as a generic login — only set the session
+      // client-side when the URL contains recovery tokens.
+      const current = await supabase.auth.getSession();
+      const session = (current as any)?.data?.session;
+
+      if (!session) {
+        const params = new URLSearchParams(window.location.search);
+        const type = params.get("type");
+        const accessToken = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
+
+        if (type !== "recovery") {
+          throw new Error("Enlace no válido para recuperación de contraseña.");
+        }
+
+        if (accessToken && refreshToken) {
+          const { error: setError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (setError) throw setError;
+        } else {
+          throw new Error("Tokens de recuperación no encontrados.");
+        }
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: password.trim(),
       });
@@ -45,17 +72,29 @@
       infoMessage = "Tu contraseña se actualizó correctamente.";
       isError = false;
 
+      // Clear session after password update to avoid leaving user logged in
+      // as part of the recovery flow, then redirect.
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        // Not critical
+      }
+
       // Redirect to original system after short delay
       setTimeout(() => {
         const target = data.redirectTo || "/";
         window.location.href = target;
-      }, 2000);
+      }, 1200);
     } catch (err: any) {
       console.error("Error actualizando contraseña:", err);
       const msg = (err.message || "").toLowerCase();
 
+      if (msg.includes("enlace no válido") || msg.includes("tokens")) {
+        infoMessage = "El enlace de recuperación no es válido o expiró.";
+      }
+
       // Same password error - various phrases Supabase might return
-      if (
+      else if (
         msg.includes("same as") ||
         msg.includes("different from") ||
         msg.includes("must be different") ||

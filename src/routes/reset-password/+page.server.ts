@@ -18,12 +18,10 @@ export const load: PageServerLoad = async ({ url, cookies, request }) => {
 
   const isDev = process.env.NODE_ENV === "development";
 
-  // Determine which flow we're using
-  const hasPkceCode = !!code;
-  const hasLegacyTokens = type === "recovery" && accessToken && refreshToken;
-
-  // Must have either PKCE code or legacy tokens
-  if (!hasPkceCode && !hasLegacyTokens) {
+  // This route is exclusively for password recovery. Reject any non-recovery
+  // flows (e.g. PKCE / OAuth sign-in or magic-link sign-in) to avoid
+  // treating reset links as authentication flows.
+  if (type !== "recovery") {
     return {
       valid: false,
       error:
@@ -33,99 +31,52 @@ export const load: PageServerLoad = async ({ url, cookies, request }) => {
     };
   }
 
-  // Create Supabase client
-  const supabase = createSupabaseServerClient({ request, cookies });
-
-  try {
-    let sessionError: Error | null = null;
-
-    if (hasPkceCode) {
-      // PKCE flow: exchange code for session
-      console.log("[ResetPassword] Processing PKCE code flow...");
-      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-      if (error) {
-        console.error(
-          "[ResetPassword] exchangeCodeForSession error:",
-          error.message
-        );
-        sessionError = error;
-      } else {
-        console.log(
-          "[ResetPassword] PKCE code exchanged successfully for:",
-          data.session?.user?.email
-        );
-      }
-    } else if (hasLegacyTokens) {
-      // Legacy flow: set session with tokens
-      console.log("[ResetPassword] Processing legacy token flow...");
-      const { error } = await supabase.auth.setSession({
-        access_token: accessToken!,
-        refresh_token: refreshToken!,
-      });
-      if (error) {
-        console.error("[ResetPassword] setSession error:", error.message);
-        sessionError = error;
-      }
-    }
-
-    if (sessionError) {
-      return {
-        valid: false,
-        error:
-          "El enlace no es válido o ha expirado. Por favor solicita uno nuevo.",
-        system: null,
-        redirectTo: null,
-      };
-    }
-
-    // Verify session is active
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return {
-        valid: false,
-        error:
-          "No se pudo establecer la sesión. Por favor solicita un nuevo enlace.",
-        system: null,
-        redirectTo: null,
-      };
-    }
-
-    // Resolve brand config
-    let brandConfig = isSystemValid(system) ? resolveBrand(system) : null;
-    if (!brandConfig && isDev) {
-      brandConfig = resolveBrand("local");
-    }
-
-    // Determine final redirect URL after password reset
-    let finalRedirect =
-      redirectTo || brandConfig?.redirectUrlAfterLogin || DEFAULT_REDIRECT_URL;
-
-    // In development, rewrite production URLs to localhost
-    if (isDev && finalRedirect) {
-      try {
-        const parsed = new URL(finalRedirect);
-        if (parsed.host && parsed.host.includes("interfundeoms")) {
-          finalRedirect = `${url.origin}${parsed.pathname}${parsed.search}`;
-        }
-      } catch {
-        // If parsing fails, keep as-is
-      }
-    }
-
-    console.log("[ResetPassword] Session established for:", session.user.email);
-    console.log("[ResetPassword] Will redirect to:", finalRedirect);
-
+  // Ensure tokens are present (we expect legacy recovery tokens). We do NOT
+  // establish a server-side session here; the browser will set the session
+  // temporarily to allow updating the password and then the app will clear
+  // it. This prevents treating recovery as a login flow.
+  if (!accessToken || !refreshToken) {
     return {
-      valid: true,
-      error: null,
-      system: system || null,
-      redirectTo: finalRedirect,
-      userEmail: session.user.email,
-      brandConfig,
+      valid: false,
+      error: "Tokens de recuperación no encontrados en la URL.",
+      system: null,
+      redirectTo: null,
     };
+  }
+
+  // Resolve brand config
+  let brandConfig = isSystemValid(system) ? resolveBrand(system) : null;
+  if (!brandConfig && isDev) {
+    brandConfig = resolveBrand("local");
+  }
+
+  // Determine final redirect URL after password reset (preserve redirect_to)
+  let finalRedirect =
+    redirectTo || brandConfig?.redirectUrlAfterLogin || DEFAULT_REDIRECT_URL;
+
+  // In development, rewrite production URLs to localhost
+  if (isDev && finalRedirect) {
+    try {
+      const parsed = new URL(finalRedirect);
+      if (parsed.host && parsed.host.includes("interfundeoms")) {
+        finalRedirect = `${url.origin}${parsed.pathname}${parsed.search}`;
+      }
+    } catch {
+      // If parsing fails, keep as-is
+    }
+  }
+
+  // We intentionally do not resolve the user's email here (would require a
+  // server-side session). The client will set the provided tokens temporarily
+  // to perform the password update.
+  return {
+    valid: true,
+    error: null,
+    system: system || null,
+    redirectTo: finalRedirect,
+    userEmail: null,
+    brandConfig,
+  };
   } catch (err: any) {
     console.error("[ResetPassword] Unexpected error:", err);
     return {

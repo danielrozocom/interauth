@@ -22,6 +22,10 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 
   // 1. Validar si hay código o tokens
   if (type === "recovery") {
+    // For recovery links we do NOT establish a session here. Instead we
+    // forward the tokens to `/reset-password` and let that route handle
+    // the password reset UI. This avoids treating recovery as a magic
+    // link login flow.
     if (!accessToken || !refreshToken) {
       result.message = "Tokens de recuperación no encontrados en la URL.";
       return result;
@@ -34,37 +38,32 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
   }
 
   try {
-    // 2. Establecer sesión
-    let error;
-    if (type === "recovery") {
-      const { error: setError } = await supabase.auth.setSession({
-        access_token: accessToken!,
-        refresh_token: refreshToken!,
-      });
-      error = setError;
-    } else {
+    // For non-recovery flows we still need to exchange the code and
+    // establish a session (OAuth / sign-in). For recovery we purposely
+    // skip session establishment to keep this flow focused on password
+    // reset rather than login.
+    let error = null;
+    if (type !== "recovery") {
       const { error: exchangeError } =
         await supabase.auth.exchangeCodeForSession(code!);
       error = exchangeError;
-    }
+      if (error) {
+        console.warn("Error al establecer sesión:", error.message);
+        result.message =
+          "El enlace no es válido o ha expirado. Por favor solicita uno nuevo.";
+        return result;
+      }
 
-    if (error) {
-      console.warn("Error al establecer sesión:", error.message);
-      // Mensaje amigable, NO redirigimos, NO error 500
-      result.message =
-        "El enlace no es válido o ha expirado. Por favor solicita uno nuevo.";
-      return result;
-    }
+      // Verify session
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    // 3. Verificar sesión activa
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      result.message =
-        "No se pudo establecer la sesión. Intenta iniciar sesión manualmente.";
-      return result;
+      if (!session) {
+        result.message =
+          "No se pudo establecer la sesión. Intenta iniciar sesión manualmente.";
+        return result;
+      }
     }
 
     // 4. Éxito: Preparar URL de destino
