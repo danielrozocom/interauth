@@ -23,6 +23,13 @@ export const load: PageServerLoad = async ({ url, locals }) => {
   const hasSupabaseFlow = hasSupabaseReservedParam(url.searchParams);
   const isDev = process.env.NODE_ENV === "development";
 
+  const redirectTo = url.searchParams.get("redirectTo");
+  const { session } = await locals.safeGetSession();
+
+  if (session && redirectTo) {
+    throw redirect(303, redirectTo);
+  }
+
   // 1. Procesar intercambio de código (Sign In with Google/Magic Link)
   if (code) {
     console.log(`[Auth] Code detected for system: ${system || "unknown"}`);
