@@ -1,107 +1,101 @@
-import type { PageServerLoad } from "./$types";
-import { createSupabaseServerClient } from "$lib/supabase/serverClient";
-import {
-  resolveBrand,
-  isSystemValid,
-  DEFAULT_REDIRECT_URL,
-} from "$lib/brandConfig";
+import { fail, redirect } from "@sveltejs/kit";
+import type { PageServerLoad, Actions } from "./$types";
+import { resolveBrand, isSystemValid } from "$lib/brandConfig";
 
-export const load: PageServerLoad = async ({ url, cookies, request }) => {
-  // Extract URL parameters - support both PKCE and legacy flows
-  try {
-    const code = url.searchParams.get("code") || url.searchParams.get("token");
-    const accessToken = url.searchParams.get("access_token");
-    const refreshToken = url.searchParams.get("refresh_token");
-    const type = url.searchParams.get("type");
-    const system = url.searchParams.get("system");
-    const redirectTo =
-      url.searchParams.get("redirectTo") || url.searchParams.get("redirect_to");
+export const load: PageServerLoad = async ({ url, locals }) => {
+  const code = url.searchParams.get("code");
+  const system = url.searchParams.get("system");
+  const redirectTo =
+    url.searchParams.get("redirect_to") || url.searchParams.get("redirectTo");
 
-    const isDev = process.env.NODE_ENV === "development";
+  let session = null;
+  let error = null;
 
-    // This route is exclusively for password recovery. Reject any non-recovery
-    // flows (e.g. PKCE / OAuth sign-in or magic-link sign-in) to avoid
-    // treating reset links as authentication flows.
-    if (type !== "recovery") {
-      return {
-        valid: false,
-        error:
-          "Esta página solo es accesible desde un enlace de recuperación de contraseña.",
-        system: null,
-        redirectTo: null,
-      };
+  // 1. Try to exchange code if present (PKCE flow)
+  if (code) {
+    const { data, error: exchangeError } =
+      await locals.supabase.auth.exchangeCodeForSession(code);
+    if (exchangeError) {
+      error = "El enlace de recuperación ha expirado o no es válido.";
+    } else {
+      session = data.session;
     }
-
-    // Ensure tokens are present. Support both PKCE (code) and legacy (tokens).
-    if (code) {
-      const supabase = createSupabaseServerClient({ request, cookies });
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (error) {
-        return {
-          valid: false,
-          error: "El enlace de recuperación no es válido o ha expirado.",
-          system: null,
-          redirectTo: null,
-        };
-      }
-    } else if (!accessToken || !refreshToken) {
-      return {
-        valid: false,
-        error: "Tokens de recuperación no encontrados en la URL.",
-        system: null,
-        redirectTo: null,
-      };
-    }
-
-    if (!system) {
-      return {
-        valid: false,
-        error: "Falta el parámetro 'system'.",
-        system: null,
-        redirectTo: null,
-      };
-    }
-
-    // Resolve brand config
-    let brandConfig = isSystemValid(system) ? resolveBrand(system) : null;
-    if (!brandConfig && isDev) {
-      brandConfig = resolveBrand("local");
-    }
-
-    // Determine final redirect URL after password reset (preserve redirect_to)
-    let finalRedirect =
-      redirectTo || brandConfig?.redirectUrlAfterLogin || DEFAULT_REDIRECT_URL;
-
-    // In development, rewrite production URLs to localhost
-    if (isDev && finalRedirect) {
-      try {
-        const parsed = new URL(finalRedirect);
-        if (parsed.host && parsed.host.includes("interfundeoms")) {
-          finalRedirect = `${url.origin}${parsed.pathname}${parsed.search}`;
-        }
-      } catch {
-        // If parsing fails, keep as-is
-      }
-    }
-
-    // We intentionally do not resolve the user's email here (would require a
-    // server-side session). The client will set the provided tokens temporarily
-    // to perform the password update.
-    return {
-      valid: true,
-      error: null,
-      system: system || null,
-      redirectTo: finalRedirect,
-      userEmail: null,
-      brandConfig,
-    };
-  } catch (err: any) {
-    console.error("[ResetPassword] Unexpected error:", err);
-    return {
-      valid: false,
-      error: "Ocurrió un error inesperado. Por favor solicita un nuevo enlace.",
-      system: null,
-      redirectTo: null,
-    };
+  } else {
+    // 2. If no code, check for existing session (e.g. page refresh)
+    const { session: existingSession } = await locals.safeGetSession();
+    session = existingSession;
   }
+
+  // 3. Validate session
+  if (!session) {
+    // If we had a code and failed, error is already set.
+    // If we didn't have a code, set error.
+    if (!code) {
+      error =
+        "Enlace no válido. Esta página solo es accesible desde un enlace de recuperación de contraseña.";
+    }
+  }
+
+  // Resolve brand config for UI
+  let brandConfig = null;
+  if (system && isSystemValid(system)) {
+    brandConfig = resolveBrand(system);
+  } else {
+    brandConfig = resolveBrand("auth");
+  }
+
+  return {
+    valid: !!session && !error,
+    error,
+    system,
+    redirectTo,
+    brandConfig,
+  };
+};
+
+export const actions: Actions = {
+  default: async ({ request, locals }) => {
+    const formData = await request.formData();
+    const password = formData.get("password") as string;
+    const system = formData.get("system") as string;
+    const redirectTo = formData.get("redirect_to") as string;
+
+    if (!password) {
+      return fail(400, {
+        error: "La contraseña es requerida",
+        valid: true,
+        system,
+        redirectTo,
+      });
+    }
+
+    const { error } = await locals.supabase.auth.updateUser({ password });
+
+    if (error) {
+      return fail(500, {
+        error: error.message,
+        valid: true,
+        system,
+        redirectTo,
+      });
+    }
+
+    // Redirect
+    let target = redirectTo || "/";
+
+    // Ensure system param is preserved if needed
+    if (system && target.startsWith("http")) {
+      try {
+        const url = new URL(target);
+        if (!url.searchParams.has("system")) {
+          url.searchParams.set("system", system);
+          target = url.toString();
+        }
+      } catch (e) {
+        // Ignore invalid URL parsing
+      }
+    }
+
+    throw redirect(303, target);
+  },
 };

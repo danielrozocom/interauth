@@ -1,134 +1,19 @@
 <script lang="ts">
-  import type { PageData } from "./$types";
+  import type { PageData, ActionData } from "./$types";
+  import { enhance } from "$app/forms";
   import PasswordInput from "$lib/components/PasswordInput.svelte";
-  import { createSupabaseBrowserClient } from "$lib/supabase/browserClient";
 
   export let data: PageData;
-
-  const supabase = createSupabaseBrowserClient({});
+  export let form: ActionData;
 
   let password = "";
   let confirmPassword = "";
-  let infoMessage: string | null = null;
-  let isError = false;
+  let clientError = "";
   let isSubmitting = false;
-  let isSuccess = false;
 
-  async function handleSubmit() {
-    isSubmitting = true;
-    infoMessage = null;
-    isError = false;
-
-    // Validate passwords
-    if (!password || password.length < 6) {
-      infoMessage = "La contraseña debe tener al menos 6 caracteres.";
-      isError = true;
-      isSubmitting = false;
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      infoMessage = "Las contraseñas no coinciden.";
-      isError = true;
-      isSubmitting = false;
-      return;
-    }
-
-    try {
-      // Ensure we have an authenticated session for the recovery token.
-      // We avoid treating this as a generic login — only set the session
-      // client-side when the URL contains recovery tokens.
-      const current = await supabase.auth.getSession();
-      const session = (current as any)?.data?.session;
-
-      if (!session) {
-        const params = new URLSearchParams(window.location.search);
-        const type = params.get("type");
-        const accessToken = params.get("access_token");
-        const refreshToken = params.get("refresh_token");
-
-        if (type !== "recovery") {
-          throw new Error("Enlace no válido para recuperación de contraseña.");
-        }
-
-        if (accessToken && refreshToken) {
-          const { error: setError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          if (setError) throw setError;
-        } else {
-          throw new Error("Tokens de recuperación no encontrados.");
-        }
-      }
-
-      const { error } = await supabase.auth.updateUser({
-        password: password.trim(),
-      });
-
-      if (error) throw error;
-
-      isSuccess = true;
-      infoMessage = "Tu contraseña se actualizó correctamente.";
-      isError = false;
-
-      // Clear session after password update to avoid leaving user logged in
-      // as part of the recovery flow, then redirect.
-      try {
-        await supabase.auth.signOut();
-      } catch (e) {
-        // Not critical
-      }
-
-      // Redirect to original system after short delay
-      setTimeout(() => {
-        const target = data.redirectTo || "/";
-        window.location.href = target;
-      }, 1200);
-    } catch (err: any) {
-      console.error("Error actualizando contraseña:", err);
-      const msg = (err.message || "").toLowerCase();
-
-      if (msg.includes("enlace no válido") || msg.includes("tokens")) {
-        infoMessage = "El enlace de recuperación no es válido o expiró.";
-      }
-
-      // Same password error - various phrases Supabase might return
-      else if (
-        msg.includes("same as") ||
-        msg.includes("different from") ||
-        msg.includes("must be different") ||
-        msg.includes("should be different") ||
-        msg.includes("cannot be the same")
-      ) {
-        infoMessage = "La nueva contraseña no puede ser igual a la anterior.";
-      }
-      // Password validation/complexity errors
-      else if (
-        msg.includes("too short") ||
-        msg.includes("too weak") ||
-        msg.includes("at least") ||
-        msg.includes("minimum") ||
-        msg.includes("complexity") ||
-        msg.includes("requirements") ||
-        msg.includes("uppercase") ||
-        msg.includes("lowercase") ||
-        msg.includes("number") ||
-        msg.includes("special character")
-      ) {
-        infoMessage =
-          "La nueva contraseña no cumple los requisitos de seguridad.";
-      }
-      // Generic fallback
-      else {
-        infoMessage =
-          "No pudimos actualizar tu contraseña. Intenta nuevamente.";
-      }
-      isError = true;
-    } finally {
-      isSubmitting = false;
-    }
-  }
+  // Combine errors from server load, server action, or client validation
+  $: error = form?.error || data.error || clientError;
+  $: valid = data.valid;
 
   function goToLogin() {
     window.location.href = "/";
@@ -154,7 +39,7 @@
         </h1>{/if}
     </div>
     <div class="card-body">
-      {#if !data.valid}
+      {#if !valid}
         <!-- Error state: invalid or expired link -->
         <div class="error-icon">
           <svg
@@ -175,49 +60,49 @@
         </div>
         <h2>Enlace no válido</h2>
         <div class="form-group">
-          <p>{data.error}</p>
-          <button on:click={goToLogin} class="login-btn">
-            Volver al inicio
-          </button>
-        </div>
-      {:else if isSuccess}
-        <!-- Success state -->
-        <div class="success-icon">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            stroke="currentColor"
-            width="80"
-            height="80"
+          <p>{error}</p>
+          <button on:click={goToLogin} class="login-btn"
+            >Volver al inicio</button
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </div>
-        <h2>¡Listo!</h2>
-        <div class="form-group">
-          <p>
-            Tu contraseña se actualizó correctamente.<br />
-            Redirigiendo...
-          </p>
-          <div class="spinner-container">
-            <span class="spinner-large"></span>
-          </div>
         </div>
       {:else}
         <!-- Password reset form -->
         <h2>Nueva Contraseña</h2>
         <p>Crea una nueva contraseña segura para tu cuenta.</p>
-        {#if data.userEmail}
-          <p class="user-email"><strong>{data.userEmail}</strong></p>
-        {/if}
+
         <img src="/favicon.svg" alt="Logo" class="top-logo" />
-        <div class="form-group">
+
+        <form
+          method="POST"
+          use:enhance={({ cancel }) => {
+            clientError = "";
+            if (password.length < 6) {
+              clientError = "La contraseña debe tener al menos 6 caracteres.";
+              cancel();
+              return;
+            }
+            if (password !== confirmPassword) {
+              clientError = "Las contraseñas no coinciden.";
+              cancel();
+              return;
+            }
+            isSubmitting = true;
+            return async ({ update, result }) => {
+              if (result.type === "failure") {
+                isSubmitting = false;
+              }
+              await update();
+            };
+          }}
+          class="form-group"
+        >
+          <input type="hidden" name="system" value={data.system ?? ""} />
+          <input
+            type="hidden"
+            name="redirect_to"
+            value={data.redirectTo ?? ""}
+          />
+
           <PasswordInput
             bind:value={password}
             placeholder="Nueva contraseña"
@@ -230,7 +115,7 @@
           />
 
           <button
-            on:click={handleSubmit}
+            type="submit"
             class="login-btn mb-2"
             disabled={isSubmitting || !password || password.length < 6}
             style:--primary-color={data.brandConfig?.primaryColor || "#35528c"}
@@ -242,16 +127,16 @@
             {/if}
           </button>
 
-          {#if infoMessage}
-            <div class={isError ? "error-message" : "info-message"}>
-              {infoMessage}
+          {#if error}
+            <div class="error-message">
+              {error}
             </div>
           {/if}
 
-          <button class="link-btn" on:click={goToLogin}>
+          <button type="button" class="link-btn" on:click={goToLogin}>
             Volver al login
           </button>
-        </div>
+        </form>
       {/if}
     </div>
   </div>
