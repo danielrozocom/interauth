@@ -20,7 +20,9 @@
     window.location.href = "/";
   }
 
-  $: pageTitle = (valid ? "Nueva Contraseña" : "Enlace No Válido") + (data.brandConfig?.name ? ` | ${data.brandConfig.name}` : "");
+  $: pageTitle =
+    (valid ? "Nueva Contraseña" : "Enlace No Válido") +
+    (data.brandConfig?.name ? ` | ${data.brandConfig.name}` : "");
 </script>
 
 <svelte:head>
@@ -57,7 +59,7 @@
             />
           </svg>
         </div>
-        <h2>Enlace no válido</h2>
+        <h2>Enlace No Válido</h2>
         <div class="form-group">
           <p>{error}</p>
           <button on:click={goToLogin} class="login-btn"

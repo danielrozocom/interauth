@@ -49,7 +49,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     // If we didn't have a code, set error.
     if (!code) {
       error =
-        "Enlace no válido. Esta página solo es accesible desde un enlace de recuperación de contraseña.";
+        "Este enlace de recuperación ya no es válido o ha expirado. Para continuar, solicita un nuevo enlace de recuperación de contraseña.";
     }
   }
 
