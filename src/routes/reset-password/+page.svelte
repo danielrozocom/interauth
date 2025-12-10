@@ -10,6 +10,7 @@
   let confirmPassword = "";
   let clientError = "";
   let isSubmitting = false;
+  let isSuccess = false;
 
   // Combine errors from server load, server action, or client validation
   $: error = form?.error || data.error || clientError;
@@ -65,10 +66,42 @@
             >Volver al inicio</button
           >
         </div>
+      {:else if isSuccess}
+        <!-- Success state -->
+        <div class="success-icon">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            stroke="currentColor"
+            width="80"
+            height="80"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </div>
+        <h2>¡Listo!</h2>
+        <div class="form-group">
+          <p>
+            Tu contraseña se actualizó correctamente.<br />
+            Redirigiendo...
+          </p>
+          <div class="spinner-container">
+            <span class="spinner-large"></span>
+          </div>
+        </div>
       {:else}
         <!-- Password reset form -->
         <h2>Nueva Contraseña</h2>
         <p>Crea una nueva contraseña segura para tu cuenta.</p>
+        {#if data.userEmail}
+          <p class="user-email"><strong>{data.userEmail}</strong></p>
+        {/if}
 
         <img src="/favicon.svg" alt="Logo" class="top-logo" />
 
@@ -90,6 +123,11 @@
             return async ({ update, result }) => {
               if (result.type === "failure") {
                 isSubmitting = false;
+              } else if (result.type === "success" && result.data?.success) {
+                isSuccess = true;
+                setTimeout(() => {
+                  window.location.href = result.data.redirectTo;
+                }, 2000);
               }
               await update();
             };

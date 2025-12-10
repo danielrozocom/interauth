@@ -50,6 +50,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     system,
     redirectTo,
     brandConfig,
+    userEmail: session?.user?.email,
   };
 };
 
@@ -72,8 +73,22 @@ export const actions: Actions = {
     const { error } = await locals.supabase.auth.updateUser({ password });
 
     if (error) {
+      let errorMessage = error.message;
+      const msg = errorMessage.toLowerCase();
+
+      if (
+        msg.includes("different from") ||
+        msg.includes("same as") ||
+        msg.includes("should be different")
+      ) {
+        errorMessage = "La nueva contraseña no puede ser igual a la anterior.";
+      } else if (msg.includes("password should be")) {
+        errorMessage =
+          "La contraseña no cumple con los requisitos de seguridad.";
+      }
+
       return fail(500, {
-        error: error.message,
+        error: errorMessage,
         valid: true,
         system,
         redirectTo,
@@ -96,6 +111,9 @@ export const actions: Actions = {
       }
     }
 
-    throw redirect(303, target);
+    return {
+      success: true,
+      redirectTo: target,
+    };
   },
 };
