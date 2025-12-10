@@ -81,7 +81,7 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
     result.connected = true;
     result.message = "Verificado correctamente. Redirigiendo...";
 
-    // Lógica de destino actualizada
+    // LÓGICA DE REDIRECCIÓN - Garantiza que siempre hay un redirectUrl válido
     if (type === "recovery") {
       // For recovery, redirect to the dedicated reset-password page
       const params = new URLSearchParams();
@@ -117,12 +117,28 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
     console.log("Current URL:", url.toString());
     console.log("Type:", type);
     console.log("Redirect To Param:", redirectTo);
+    console.log("System Param:", system);
+    console.log("Connected:", result.connected);
     console.log("Final Redirect URL:", result.redirectUrl);
     console.log("-------------------------------");
   } catch (err: any) {
     console.error("Excepción en callback:", err);
     result.message = "Ocurrió un error inesperado al procesar la solicitud.";
   }
+
+  // Verificar que siempre hay un redirectUrl válido
+  if (result.connected && !result.redirectUrl) {
+    console.warn(
+      "⚠️ Connected=true pero sin redirectUrl. Asignando valor por defecto: /"
+    );
+    result.redirectUrl = "/";
+  }
+
+  console.log("📤 Retornando result al cliente:", {
+    connected: result.connected,
+    redirectUrl: result.redirectUrl,
+    message: result.message,
+  });
 
   return result;
 };

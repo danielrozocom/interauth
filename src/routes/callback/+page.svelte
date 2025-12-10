@@ -5,12 +5,37 @@
   export let data: PageData;
 
   onMount(() => {
+    // Debug: log de lo que recibimos del servidor
+    console.log("📥 Datos recibidos en callback/+page.svelte:", {
+      connected: data.connected,
+      redirectUrl: data.redirectUrl,
+      message: data.message,
+      isRecovery: data.isRecovery,
+    });
+
+    // Si la sesión se creó exitosamente y hay una URL de redirección
     if (data.connected && data.redirectUrl) {
+      console.log("✅ Redirección válida detectada");
       // Redirección controlada por el cliente solo si fue exitoso
       // Usamos replace para no ensuciar el historial
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        console.log("🔄 Redirigiendo a:", data.redirectUrl);
         window.location.replace(data.redirectUrl);
       }, 500); // Pequeño delay para UX (ver el check)
+
+      // Fallback: si por alguna razón no se ejecuta, reintentar
+      return () => clearTimeout(timer);
+    } else if (data.connected && !data.redirectUrl) {
+      // Caso edge: sesión exitosa pero sin redirectUrl (no debería ocurrir)
+      console.warn("⚠️ Sesión creada pero sin redirectUrl. Redirigiendo a /");
+      setTimeout(() => {
+        window.location.replace("/");
+      }, 500);
+    } else {
+      console.log(
+        "❌ No se redirige porque:",
+        !data.connected ? "connected=false" : "redirectUrl vacío"
+      );
     }
   });
 </script>
