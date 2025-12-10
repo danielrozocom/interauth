@@ -58,6 +58,21 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 
       if (user) {
         console.log(`[Auth] User authenticated: ${user.email}`);
+        const redirectTo =
+          url.searchParams.get("redirectTo") ||
+          url.searchParams.get("redirect_to");
+        const brandConfig = resolveBrand(system || "auth");
+        let target = "/";
+
+        if (redirectTo) {
+          target = redirectTo;
+        } else if (brandConfig && brandConfig.redirectUrlAfterLogin) {
+          target = brandConfig.redirectUrlAfterLogin;
+        } else {
+          // Fallback a InterPOS por defecto si no hay system
+          target = DEFAULT_REDIRECT_URL;
+        }
+
         // Normalize target for development: if target is relative use current origin,
         // and if running in dev replace production host with current origin so
         // the whole flow stays on localhost.
@@ -79,23 +94,6 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 
         console.log(`[Auth] Redirecting to: ${finalTarget}`);
         throw redirect(303, finalTarget);
-        const redirectTo =
-          url.searchParams.get("redirectTo") ||
-          url.searchParams.get("redirect_to");
-        const brandConfig = resolveBrand(system || "auth");
-        let target = "/";
-
-        if (redirectTo) {
-          target = redirectTo;
-        } else if (brandConfig && brandConfig.redirectUrlAfterLogin) {
-          target = brandConfig.redirectUrlAfterLogin;
-        } else {
-          // Fallback a InterPOS por defecto si no hay system
-          target = DEFAULT_REDIRECT_URL;
-        }
-
-        console.log(`[Auth] Redirecting to: ${target}`);
-        throw redirect(303, target);
       }
     } catch (err) {
       // Si el error es una redirección, dejarlo pasar (SvelteKit funciona así)
