@@ -18,8 +18,8 @@ import {
 } from "$env/static/public";
 
 if (!PUBLIC_SUPABASE_URL || !PUBLIC_SUPABASE_ANON_KEY) {
-  console.error(
-    "❌ Missing PUBLIC_SUPABASE_URL or PUBLIC_SUPABASE_ANON_KEY in supabaseClient.ts"
+  console.warn(
+    "⚠️ Missing PUBLIC_SUPABASE_URL or PUBLIC_SUPABASE_ANON_KEY in supabaseClient.ts. Using placeholders to prevent build failure."
   );
 }
 
@@ -28,8 +28,8 @@ if (!PUBLIC_SUPABASE_URL || !PUBLIC_SUPABASE_ANON_KEY) {
  * Usa este cliente para todas las operaciones de autenticación
  */
 export const supabase = createClient(
-  PUBLIC_SUPABASE_URL || "",
-  PUBLIC_SUPABASE_ANON_KEY || "",
+  PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
+  PUBLIC_SUPABASE_ANON_KEY || "placeholder",
   {
     auth: {
       // Configuración de persistencia de sesión

@@ -19,17 +19,12 @@
   function goToLogin() {
     window.location.href = "/";
   }
+
+  $: pageTitle = (valid ? "Nueva Contraseña" : "Enlace No Válido") + (data.brandConfig?.name ? ` | ${data.brandConfig.name}` : "");
 </script>
 
 <svelte:head>
-  <title>
-    {#if !valid}
-      Enlace No Válido
-    {:else}
-      Nueva Contraseña
-    {/if}
-    {data.brandConfig?.name ? ` | ${data.brandConfig.name}` : ""}
-  </title>
+  <title>{pageTitle}</title>
 </svelte:head>
 
 <div class="login-page">
