@@ -1,4 +1,5 @@
 import type { PageServerLoad } from "./$types";
+import { redirect } from "@sveltejs/kit";
 import { DEFAULT_REDIRECT_URL, resolveBrand } from "$lib/brandConfig";
 
 export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
@@ -11,6 +12,24 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
   // Support both camelCase and snake_case for redirect URL
   const redirectTo =
     url.searchParams.get("redirectTo") || url.searchParams.get("redirect_to");
+
+  // Check if session already exists and redirect immediately
+  const {
+    data: { session: existingSession },
+  } = await supabase.auth.getSession();
+  if (existingSession) {
+    if (redirectTo) {
+      throw redirect(302, redirectTo);
+    } else if (system) {
+      const brandConfig = resolveBrand(system);
+      throw redirect(
+        302,
+        brandConfig?.redirectUrlAfterLogin || DEFAULT_REDIRECT_URL
+      );
+    } else {
+      throw redirect(302, DEFAULT_REDIRECT_URL);
+    }
+  }
 
   // Estado inicial de la respuesta
   const result = {
@@ -139,6 +158,11 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
     redirectUrl: result.redirectUrl,
     message: result.message,
   });
+
+  // Redirect automatically if connected
+  if (result.connected) {
+    throw redirect(302, result.redirectUrl);
+  }
 
   return result;
 };
