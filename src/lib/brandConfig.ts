@@ -21,6 +21,12 @@ export interface BrandConfig {
   logoUrl?: string;
   /** Subtítulo opcional que aparece debajo del nombre en la pantalla de login */
   subtitle?: string;
+  /** Texto del botón de login con correo */
+  loginButtonText?: string;
+  /** Texto del botón de login con Google */
+  googleButtonText?: string;
+  /** Texto del enlace de recuperación de contraseña */
+  forgotPasswordText?: string;
 }
 
 /**

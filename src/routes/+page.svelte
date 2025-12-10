@@ -501,7 +501,10 @@
             {#if isPasswordSubmitting}
               <span class="spinner"></span>
             {:else}
-              <span>Iniciar sesión con correo</span>
+              <span
+                >{data.brandConfig?.loginButtonText ||
+                  "Iniciar sesión con correo"}</span
+              >
             {/if}
           </button>
           {#if infoMessage}
@@ -527,7 +530,8 @@
               goto(`/recover-password?${params.toString()}`);
             }}
           >
-            ¿Olvidaste tu contraseña?
+            {data.brandConfig?.forgotPasswordText ||
+              "¿Olvidaste tu contraseña?"}
           </button>
         </div>
 
@@ -571,7 +575,10 @@
                 />
               </svg>
             </span>
-            <span>Iniciar sesión con Google</span>
+            <span
+              >{data.brandConfig?.googleButtonText ||
+                "Iniciar sesión con Google"}</span
+            >
           {/if}
         </button>
 
