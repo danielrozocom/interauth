@@ -8,15 +8,32 @@ export const load: PageServerLoad = async ({ url, locals }) => {
   const redirectTo =
     url.searchParams.get("redirect_to") || url.searchParams.get("redirectTo");
 
+  // Check for Supabase error params in URL
+  const errorParam = url.searchParams.get("error");
+  const errorCode = url.searchParams.get("error_code");
+  const errorDescription = url.searchParams.get("error_description");
+
   let session = null;
   let error = null;
 
-  // 1. Try to exchange code if present (PKCE flow)
-  if (code) {
+  if (errorParam || errorCode || errorDescription) {
+    if (
+      errorCode === "otp_expired" ||
+      errorDescription?.includes("expired") ||
+      errorDescription?.includes("invalid")
+    ) {
+      error =
+        "Este enlace de recuperación ya no es válido o ha expirado. Para continuar, solicita un nuevo enlace de recuperación de contraseña.";
+    } else {
+      error = errorDescription || "Enlace no válido.";
+    }
+  } else if (code) {
+    // 1. Try to exchange code if present (PKCE flow)
     const { data, error: exchangeError } =
       await locals.supabase.auth.exchangeCodeForSession(code);
     if (exchangeError) {
-      error = "El enlace de recuperación ha expirado o no es válido.";
+      error =
+        "Este enlace de recuperación ya no es válido o ha expirado. Para continuar, solicita un nuevo enlace de recuperación de contraseña.";
     } else {
       session = data.session;
     }

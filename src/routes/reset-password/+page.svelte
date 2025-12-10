@@ -22,11 +22,14 @@
 </script>
 
 <svelte:head>
-  <title
-    >Nueva Contraseña{data.brandConfig?.name
-      ? ` | ${data.brandConfig.name}`
-      : ""}</title
-  >
+  <title>
+    {#if !valid}
+      Enlace No Válido
+    {:else}
+      Nueva Contraseña
+    {/if}
+    {data.brandConfig?.name ? ` | ${data.brandConfig.name}` : ""}
+  </title>
 </svelte:head>
 
 <div class="login-page">
@@ -123,13 +126,15 @@
             return async ({ update, result }) => {
               if (result.type === "failure") {
                 isSubmitting = false;
+                await update();
               } else if (result.type === "success" && result.data?.success) {
                 isSuccess = true;
                 setTimeout(() => {
                   window.location.href = result.data.redirectTo;
                 }, 2000);
+              } else {
+                await update();
               }
-              await update();
             };
           }}
           class="form-group"
