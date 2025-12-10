@@ -21,6 +21,7 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
   };
 
   // 1. Validar si hay código o tokens
+  // NO REDIRIGIR ANTES DE COMPLETAR EL EXCHANGE
   if (type === "recovery") {
     // For recovery links we do NOT establish a session here. Instead we
     // forward the tokens to `/reset-password` and let that route handle
@@ -49,8 +50,18 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
       error = exchangeError;
       if (error) {
         console.warn("Error al establecer sesión:", error.message);
+        // Redirigir a /error con detalles del fallo OAuth
+        const errorParams = new URLSearchParams();
+        errorParams.set("error", "oauth_failed");
+        errorParams.set(
+          "description",
+          error.message || "OAuth exchange failed"
+        );
+        if (system) errorParams.set("system", system);
+        result.redirectUrl = "/error?" + errorParams.toString();
+        result.connected = false;
         result.message =
-          "El enlace no es válido o ha expirado. Por favor solicita uno nuevo.";
+          error.message || "El enlace no es válido o ha expirado.";
         return result;
       }
 
