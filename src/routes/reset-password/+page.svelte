@@ -104,11 +104,13 @@
           />
 
           <PasswordInput
+            name="password"
             bind:value={password}
             placeholder="Nueva contraseña"
             disabled={isSubmitting}
           />
           <PasswordInput
+            name="confirmPassword"
             bind:value={confirmPassword}
             placeholder="Confirmar contraseña"
             disabled={isSubmitting}
