@@ -174,45 +174,20 @@ function patternToRegex(pattern: string): RegExp {
 
 /**
  * Valida si una URL está permitida para un sistema dado
- * @param system - El sistema
+ * @param system - El sistema (ignorado, permite cualquier URL válida)
  * @param url - La URL a validar
- * @returns true si está permitida
+ * @returns true si es una URL absoluta válida (http o https) y no vacía
  */
 export function isRedirectUrlAllowed(
   system: string | null | undefined,
   url: string
 ): boolean {
-  const config = resolveBrand(system);
-  if (!config) return false;
+  if (!url || url.trim() === "") return false;
 
   try {
     const parsedUrl = new URL(url);
-    const isDev = process.env.NODE_ENV === "development";
-
-    // Rechazar HTTP a menos que sea dev
-    if (parsedUrl.protocol !== "https:" && !isDev) {
-      return false;
-    }
-
-    // Verificar contra allowedRedirectUrls
-    for (const pattern of config.allowedRedirectUrls) {
-      const regex = patternToRegex(pattern);
-      if (regex.test(url)) {
-        return true;
-      }
-    }
-
-    // Permitir redirecciones a subdominios de trycloudflare.com
-    if (
-      parsedUrl.hostname.match(/^[a-zA-Z0-9-]+\.trycloudflare\.com$/) &&
-      parsedUrl.protocol === "https:"
-    ) {
-      return true;
-    }
-
-    return false;
+    return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
   } catch {
-    // URL inválida
     return false;
   }
 }
