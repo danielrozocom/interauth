@@ -201,6 +201,15 @@ export function isRedirectUrlAllowed(
         return true;
       }
     }
+
+    // Permitir redirecciones a subdominios de trycloudflare.com
+    if (
+      parsedUrl.hostname.match(/^[a-zA-Z0-9-]+\.trycloudflare\.com$/) &&
+      parsedUrl.protocol === "https:"
+    ) {
+      return true;
+    }
+
     return false;
   } catch {
     // URL inválida
