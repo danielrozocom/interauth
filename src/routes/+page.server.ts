@@ -44,6 +44,10 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
   const { session } = await locals.safeGetSession();
   const type = url.searchParams.get("type");
   if (session && !code && type !== "recovery") {
+    // Si hay redirectTo válido, redirigir a ese valor con prioridad absoluta
+    if (validatedRedirectTo) {
+      throw redirect(303, validatedRedirectTo);
+    }
     // Si ya tiene sesión, redirigir según system o default
     if (system) {
       const brandConfig = resolveBrand(system);

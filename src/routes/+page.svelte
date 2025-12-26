@@ -249,8 +249,7 @@
       // Never trust or propagate `email` via query string
       urlParams.delete("email");
       const isRecovery = urlParams.get("type") === "recovery";
-      const redirectTo =
-        urlParams.get("redirectTo") || urlParams.get("redirect_to");
+      const redirectTo = data.redirectTo;
 
       if (isRecovery) {
         // For recovery, redirect to the intended destination after password update

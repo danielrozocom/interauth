@@ -1,12 +1,18 @@
 import { fail, redirect } from "@sveltejs/kit";
 import type { PageServerLoad, Actions } from "./$types";
-import { resolveBrand, isSystemValid } from "$lib/brandConfig";
+import {
+  resolveBrand,
+  isSystemValid,
+  validateAndNormalizeRedirectTo,
+} from "$lib/brandConfig";
 
 export const load: PageServerLoad = async ({ url, locals }) => {
   const code = url.searchParams.get("code");
   const system = url.searchParams.get("system");
   const redirectTo =
     url.searchParams.get("redirect_to") || url.searchParams.get("redirectTo");
+
+  const validatedRedirectTo = validateAndNormalizeRedirectTo(redirectTo);
 
   // Check for Supabase error params in URL
   const errorParam = url.searchParams.get("error");
@@ -65,7 +71,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     valid: !!session && !error,
     error,
     system,
-    redirectTo,
+    redirectTo: validatedRedirectTo,
     brandConfig,
     userEmail: session?.user?.email,
   };
@@ -78,12 +84,14 @@ export const actions: Actions = {
     const system = formData.get("system") as string;
     const redirectTo = formData.get("redirect_to") as string;
 
+    const validatedRedirectTo = validateAndNormalizeRedirectTo(redirectTo);
+
     if (!password) {
       return fail(400, {
         error: "La contraseña es requerida",
         valid: true,
         system,
-        redirectTo,
+        redirectTo: validatedRedirectTo,
       });
     }
 
@@ -108,12 +116,12 @@ export const actions: Actions = {
         error: errorMessage,
         valid: true,
         system,
-        redirectTo,
+        redirectTo: validatedRedirectTo,
       });
     }
 
     // Redirect
-    let target = redirectTo || "/";
+    let target = validatedRedirectTo || "/";
 
     // Ensure system param is preserved if needed
     if (system && target.startsWith("http")) {
