@@ -1,6 +1,9 @@
-import type { PageServerLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
-import { DEFAULT_REDIRECT_URL, resolveBrand } from "$lib/brandConfig";
+import {
+  DEFAULT_REDIRECT_URL,
+  resolveBrand,
+  validateAndNormalizeRedirectTo,
+} from "$lib/brandConfig";
 
 export const load: PageServerLoad = async ({
   url,
@@ -27,13 +30,18 @@ export const load: PageServerLoad = async ({
   const redirectTo = stateData.redirectTo || url.searchParams.get("redirectTo");
   const system = stateData.system || url.searchParams.get("system");
 
+  // Normalizar redirectTo si existe
+  const normalizedRedirectTo = redirectTo
+    ? validateAndNormalizeRedirectTo(redirectTo)
+    : null;
+
   // Check if session already exists and redirect immediately
   const {
     data: { session: existingSession },
   } = await supabase.auth.getSession();
   if (existingSession) {
-    if (redirectTo) {
-      throw redirect(302, redirectTo);
+    if (normalizedRedirectTo) {
+      throw redirect(302, normalizedRedirectTo);
     } else if (system) {
       const brandConfig = resolveBrand(system);
       throw redirect(
@@ -96,9 +104,9 @@ export const load: PageServerLoad = async ({
 
     result.redirectUrl = "/reset-password?" + params.toString();
   } else {
-    if (redirectTo) {
+    if (normalizedRedirectTo) {
       // Redirigir al redirectTo, agregando code
-      let targetUrl = redirectTo;
+      let targetUrl = normalizedRedirectTo;
       if (code && type !== "recovery") {
         const separator = targetUrl.includes("?") ? "&" : "?";
         targetUrl += `${separator}code=${encodeURIComponent(code)}`;
@@ -120,6 +128,7 @@ export const load: PageServerLoad = async ({
   console.log("Current URL:", url.toString());
   console.log("Type:", type);
   console.log("Redirect To Param:", redirectTo);
+  console.log("Normalized Redirect To:", normalizedRedirectTo);
   console.log("System Param:", system);
   console.log("Connected:", result.connected);
   console.log("Final Redirect URL:", result.redirectUrl);

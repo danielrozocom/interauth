@@ -5,6 +5,7 @@ import {
   isSystemValid,
   DEFAULT_REDIRECT_URL,
   isRedirectUrlAllowed,
+  validateAndNormalizeRedirectTo,
 } from "$lib/brandConfig";
 import type { PageServerLoad } from "./$types";
 
@@ -30,16 +31,10 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
   let validatedRedirectTo: string | null = null;
   let redirectError: string | null = null;
 
-  // Si hay redirectTo, validarlo
+  // Si hay redirectTo, validarlo y normalizarlo
   if (redirectTo) {
-    try {
-      const parsed = new URL(redirectTo);
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        redirectError = "URL de redirección debe ser http o https.";
-      } else {
-        validatedRedirectTo = redirectTo;
-      }
-    } catch {
+    validatedRedirectTo = validateAndNormalizeRedirectTo(redirectTo);
+    if (!validatedRedirectTo) {
       redirectError = "URL de redirección inválida.";
     }
   }

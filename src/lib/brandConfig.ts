@@ -193,6 +193,38 @@ export function isRedirectUrlAllowed(
 }
 
 /**
+ * Valida y normaliza una URL de redirectTo.
+ * - Si es inválida, retorna null.
+ * - Si es http:// y hostname termina en .interfundeoms.edu.co, normaliza a https://
+ * - De lo contrario, retorna la URL tal cual si es válida.
+ */
+export function validateAndNormalizeRedirectTo(
+  redirectTo: string | null
+): string | null {
+  if (!redirectTo || redirectTo.trim() === "") return null;
+
+  try {
+    const parsed = new URL(redirectTo);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    // Normalizar http://*.interfundeoms.edu.co a https://
+    if (
+      parsed.protocol === "http:" &&
+      parsed.hostname.endsWith(".interfundeoms.edu.co")
+    ) {
+      parsed.protocol = "https:";
+      return parsed.toString();
+    }
+
+    return redirectTo;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Lista blanca de parámetros que forman parte de los flujos de Supabase (GoTrue / OAuth / Magic Links)
  * Si cualquiera de estos parámetros está presente en la URL, no exigimos `system`
  */

@@ -4,6 +4,7 @@ import {
   resolveBrand,
   hasSupabaseReservedParam,
   isSystemValid,
+  validateAndNormalizeRedirectTo,
 } from "$lib/brandConfig";
 import { createSupabaseServerClient } from "$lib/supabase/serverClient";
 
@@ -40,6 +41,9 @@ export const actions: Actions = {
     const email = formData.get("email") as string;
     const redirectTo = formData.get("redirectTo") as string;
 
+    // Normalizar redirectTo
+    const normalizedRedirectTo = validateAndNormalizeRedirectTo(redirectTo);
+
     // Preserve `system` from the original URL when building the
     // email redirect that Supabase will embed in the confirmation link.
     // Also check formData because the action URL might strip query params.
@@ -50,6 +54,7 @@ export const actions: Actions = {
       email,
       system,
       redirectTo,
+      normalizedRedirectTo,
     });
 
     if (!system) {
@@ -86,7 +91,7 @@ export const actions: Actions = {
       // into the ConfirmationURL it sends by email.
       const params = new URLSearchParams();
       params.set("system", system);
-      if (redirectTo) params.set("redirect_to", redirectTo);
+      if (normalizedRedirectTo) params.set("redirect_to", normalizedRedirectTo);
 
       emailRedirectTo = `${AUTH_ORIGIN.replace(
         /\/$/,
