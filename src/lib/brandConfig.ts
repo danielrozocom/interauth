@@ -59,7 +59,10 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     name: "InterPOS",
     primaryColor: "#35528C",
     redirectUrlAfterLogin: "https://pos.interfundeoms.edu.co/",
-    allowedRedirectUrls: ["https://pos.interfundeoms.edu.co", "https://pos.otrodominio.com"],
+    allowedRedirectUrls: [
+      "https://pos.interfundeoms.edu.co",
+      "https://pos.otrodominio.com",
+    ],
     subtitle: "Login",
   },
 
@@ -68,7 +71,10 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     name: "InterAPP",
     primaryColor: "#35528C",
     redirectUrlAfterLogin: "https://app.interfundeoms.edu.co",
-    allowedRedirectUrls: ["https://*.trycloudflare.com", "https://app.interfundeoms.edu.co"],
+    allowedRedirectUrls: [
+      "https://*.trycloudflare.com",
+      "https://app.interfundeoms.edu.co",
+    ],
     subtitle: "Login",
   },
 };
@@ -156,14 +162,14 @@ export function resolveBrand(
  */
 function patternToRegex(pattern: string): RegExp {
   // Escapar caracteres especiales
-  let regex = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let regex = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Reemplazar \* con .*
-  regex = regex.replace(/\\\*/g, '.*');
+  regex = regex.replace(/\\\*/g, ".*");
   // Para localhost:*, reemplazar :* con :\d+
-  regex = regex.replace(/:\\\*/, ':\\d+');
+  regex = regex.replace(/:\\\*/, ":\\d+");
   // Agregar ^ y $ para match completo
   regex = `^${regex}(\\/.*)?$`;
-  return new RegExp(regex, 'i'); // case insensitive
+  return new RegExp(regex, "i"); // case insensitive
 }
 
 /**
@@ -172,7 +178,10 @@ function patternToRegex(pattern: string): RegExp {
  * @param url - La URL a validar
  * @returns true si está permitida
  */
-export function isRedirectUrlAllowed(system: string | null | undefined, url: string): boolean {
+export function isRedirectUrlAllowed(
+  system: string | null | undefined,
+  url: string
+): boolean {
   const config = resolveBrand(system);
   if (!config) return false;
 
@@ -181,7 +190,7 @@ export function isRedirectUrlAllowed(system: string | null | undefined, url: str
     const isDev = process.env.NODE_ENV === "development";
 
     // Rechazar HTTP a menos que sea dev
-    if (parsedUrl.protocol !== 'https:' && !isDev) {
+    if (parsedUrl.protocol !== "https:" && !isDev) {
       return false;
     }
 
