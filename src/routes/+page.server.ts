@@ -18,7 +18,7 @@ const ALLOWED_DOMAINS = [
   "https://supa.interfundeoms.edu.co",
 ];
 
-export const load: PageServerLoad = async ({ url, locals }) => {
+export const load: PageServerLoad = async ({ url, locals, cookies }) => {
   const code = url.searchParams.get("code");
   const system = url.searchParams.get("system");
   const hasSupabaseFlow = hasSupabaseReservedParam(url.searchParams);
@@ -27,97 +27,32 @@ export const load: PageServerLoad = async ({ url, locals }) => {
   const redirectTo = url.searchParams.get("redirectTo");
   const { session: currentSession } = await locals.safeGetSession();
 
-  // Validar redirectTo si está presente
-  if (redirectTo && !isRedirectUrlAllowed(system, redirectTo)) {
-    return {
-      error: "URL de redirección no permitida.",
-      system,
-    };
-  }
-
-  if (currentSession && redirectTo) {
-    throw redirect(303, redirectTo);
-  }
-
-  // 1. Procesar intercambio de código (Sign In with Google/Magic Link)
-  if (code) {
-    console.log(`[Auth] Code detected for system: ${system || "unknown"}`);
+  // Si hay redirectTo, guardarlo y redirigir a URL limpia
+  if (redirectTo) {
+    // Validar que sea URL absoluta http/https
     try {
-      const supabase = locals.supabase;
-      const { error, data } = await supabase.auth.exchangeCodeForSession(code);
-
-      if (error) {
-        console.error("[Auth] Code exchange failed:", error);
+      const parsed = new URL(redirectTo);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
         return {
-          authInfo: {
-            valid: false,
-            message:
-              "El enlace ya no es válido o ha expirado. Por favor solicita uno nuevo.",
-          },
+          error: "URL de redirección debe ser http o https.",
+          system,
         };
       }
-
-      console.log("[Auth] Session exchanged successfully.");
-
-      // Verificar si la sesión es válida con getUser
-      // Esto asegura que safeGetSession en layout se actualice
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        console.log(`[Auth] User authenticated: ${user.email}`);
-        const redirectTo =
-          url.searchParams.get("redirectTo") ||
-          url.searchParams.get("redirect_to");
-        const brandConfig = resolveBrand(system || "auth");
-        let target = "/";
-
-        if (redirectTo) {
-          target = redirectTo;
-        } else if (brandConfig && brandConfig.redirectUrlAfterLogin) {
-          target = brandConfig.redirectUrlAfterLogin;
-        } else {
-          // Fallback a InterPOS por defecto si no hay system
-          target = DEFAULT_REDIRECT_URL;
-        }
-
-        // Normalize target for development: if target is relative use current origin,
-        // and if running in dev replace production host with current origin so
-        // the whole flow stays on localhost.
-        const isDev = process.env.NODE_ENV === "development";
-        let finalTarget = target;
-        try {
-          if (finalTarget.startsWith("/")) {
-            finalTarget = `${url.origin}${finalTarget}`;
-          } else if (isDev) {
-            const parsed = new URL(finalTarget);
-            // If target points to the interfundeoms domain, rewrite to current origin
-            if (parsed.host && parsed.host.includes("interfundeoms")) {
-              finalTarget = `${url.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
-            }
-          }
-        } catch (e) {
-          // If parsing failed, keep original target
-        }
-
-        console.log(`[Auth] Redirecting to: ${finalTarget}`);
-        throw redirect(303, finalTarget);
-      }
-    } catch (err) {
-      // Si el error es una redirección, dejarlo pasar (SvelteKit funciona así)
-      if ((err as any)?.status === 303 || (err as any)?.status === 307) {
-        throw err;
-      }
-
-      console.error("[Auth] Unexpected error during code exchange:", err);
+    } catch {
       return {
-        authInfo: {
-          valid: false,
-          message: "Ocurrió un error verificando tu sesión.",
-        },
+        error: "URL de redirección inválida.",
+        system,
       };
     }
+    // Guardar en cookie por 5 minutos
+    cookies.set("pending_redirect", redirectTo, {
+      path: "/",
+      httpOnly: true,
+      secure: !isDev,
+      maxAge: 300,
+    });
+    // Redirigir a URL limpia
+    throw redirect(303, `/?system=${system || ""}`);
   }
 
   // 2. Si NO hay código, verificar si ya hay sesión activa
@@ -125,25 +60,10 @@ export const load: PageServerLoad = async ({ url, locals }) => {
   const { session } = await locals.safeGetSession();
   const type = url.searchParams.get("type");
   if (session && !code && type !== "recovery") {
-    const redirectTo =
-      url.searchParams.get("redirectTo") || url.searchParams.get("redirect_to");
-
-    if (redirectTo) {
-      // Normalize redirectTo similarly to ensure local flows stay local in dev
-      const isDev = process.env.NODE_ENV === "development";
-      let final = redirectTo;
-      try {
-        if (final.startsWith("/")) final = `${url.origin}${final}`;
-        else if (isDev) {
-          const parsed = new URL(final);
-          if (parsed.host && parsed.host.includes("interfundeoms")) {
-            final = `${url.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
-          }
-        }
-      } catch (e) {
-        // leave as-is
-      }
-      throw redirect(303, final);
+    const pendingRedirect = cookies.get("pending_redirect");
+    if (pendingRedirect) {
+      cookies.delete("pending_redirect");
+      throw redirect(303, pendingRedirect);
     }
 
     // Si ya tiene sesión, y visita root, quizás queramos mandarlo al sistema por defecto o al que pida

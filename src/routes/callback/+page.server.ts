@@ -1,36 +1,29 @@
 import type { PageServerLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
-import {
-  DEFAULT_REDIRECT_URL,
-  resolveBrand,
-  isRedirectUrlAllowed,
-} from "$lib/brandConfig";
+import { DEFAULT_REDIRECT_URL, resolveBrand } from "$lib/brandConfig";
 
-export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
+export const load: PageServerLoad = async ({
+  url,
+  locals: { supabase },
+  cookies,
+}) => {
   const code = url.searchParams.get("code");
   const accessToken = url.searchParams.get("access_token");
   const refreshToken = url.searchParams.get("refresh_token");
   const next = url.searchParams.get("next");
   const system = url.searchParams.get("system");
   const type = url.searchParams.get("type"); // recovery, signup, etc.
-  // Support both camelCase and snake_case for redirect URL
-  const redirectTo =
-    url.searchParams.get("redirectTo") || url.searchParams.get("redirect_to");
-
-  // Validar redirectTo si está presente
-  if (redirectTo && !isRedirectUrlAllowed(system, redirectTo)) {
-    result.message = "URL de redirección no permitida.";
-    result.connected = false;
-    return result;
-  }
+  // No usar redirectTo param, usar cookie
 
   // Check if session already exists and redirect immediately
   const {
     data: { session: existingSession },
   } = await supabase.auth.getSession();
   if (existingSession) {
-    if (redirectTo) {
-      throw redirect(302, redirectTo);
+    const pendingRedirect = cookies.get("pending_redirect");
+    if (pendingRedirect) {
+      cookies.delete("pending_redirect");
+      throw redirect(302, pendingRedirect);
     } else if (system) {
       const brandConfig = resolveBrand(system);
       throw redirect(
@@ -92,30 +85,34 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
     });
 
     result.redirectUrl = "/reset-password?" + params.toString();
-  } else if (redirectTo) {
-    // Redirigir exactamente a la URL solicitada, agregando code si aplica
-    let targetUrl = redirectTo;
-    if (code && type !== "recovery") {
-      const separator = targetUrl.includes("?") ? "&" : "?";
-      targetUrl += `${separator}code=${encodeURIComponent(code)}`;
-      if (system) targetUrl += `&system=${encodeURIComponent(system)}`;
-    }
-    result.redirectUrl = targetUrl;
   } else {
-    const brandConfig = resolveBrand(system);
-    let targetUrl = brandConfig?.redirectUrlAfterLogin || DEFAULT_REDIRECT_URL;
-    if (code && type !== "recovery") {
-      const separator = targetUrl.includes("?") ? "&" : "?";
-      targetUrl += `${separator}code=${encodeURIComponent(code)}`;
-      if (system) targetUrl += `&system=${encodeURIComponent(system)}`;
+    const pendingRedirect = cookies.get("pending_redirect");
+    if (pendingRedirect) {
+      // Redirigir al redirectTo guardado, agregando code
+      let targetUrl = pendingRedirect;
+      if (code && type !== "recovery") {
+        const separator = targetUrl.includes("?") ? "&" : "?";
+        targetUrl += `${separator}code=${encodeURIComponent(code)}`;
+      }
+      cookies.delete("pending_redirect");
+      result.redirectUrl = targetUrl;
+    } else {
+      const brandConfig = resolveBrand(system);
+      let targetUrl =
+        brandConfig?.redirectUrlAfterLogin || DEFAULT_REDIRECT_URL;
+      if (code && type !== "recovery") {
+        const separator = targetUrl.includes("?") ? "&" : "?";
+        targetUrl += `${separator}code=${encodeURIComponent(code)}`;
+        if (system) targetUrl += `&system=${encodeURIComponent(system)}`;
+      }
+      result.redirectUrl = targetUrl;
     }
-    result.redirectUrl = targetUrl;
   }
 
   console.log("--- Callback Redirect Debug ---");
   console.log("Current URL:", url.toString());
   console.log("Type:", type);
-  console.log("Redirect To Param:", redirectTo);
+  console.log("Pending Redirect Cookie:", cookies.get("pending_redirect"));
   console.log("System Param:", system);
   console.log("Connected:", result.connected);
   console.log("Final Redirect URL:", result.redirectUrl);
