@@ -1,6 +1,10 @@
 import type { PageServerLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
-import { DEFAULT_REDIRECT_URL, resolveBrand, isRedirectUrlAllowed } from "$lib/brandConfig";
+import {
+  DEFAULT_REDIRECT_URL,
+  resolveBrand,
+  isRedirectUrlAllowed,
+} from "$lib/brandConfig";
 
 export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
   const code = url.searchParams.get("code");
@@ -66,62 +70,56 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
     result.connected = true;
   }
 
-    // 4. Éxito: Preparar URL de destino
-    result.connected = true;
-    result.message = "Verificado correctamente. Redirigiendo...";
+  // 4. Éxito: Preparar URL de destino
+  result.connected = true;
+  result.message = "Verificado correctamente. Redirigiendo...";
 
-    // LÓGICA DE REDIRECCIÓN - Garantiza que siempre hay un redirectUrl válido
-    if (type === "recovery") {
-      // For recovery, redirect to the dedicated reset-password page
-      const params = new URLSearchParams();
-      params.set("type", "recovery");
-      if (accessToken) params.set("access_token", accessToken);
-      if (refreshToken) params.set("refresh_token", refreshToken);
+  // LÓGICA DE REDIRECCIÓN - Garantiza que siempre hay un redirectUrl válido
+  if (type === "recovery") {
+    // For recovery, redirect to the dedicated reset-password page
+    const params = new URLSearchParams();
+    params.set("type", "recovery");
+    if (accessToken) params.set("access_token", accessToken);
+    if (refreshToken) params.set("refresh_token", refreshToken);
 
-      // Preserve other parameters (system, redirect_to, etc.)
-      url.searchParams.forEach((value, key) => {
-        if (
-          !["code", "access_token", "refresh_token", "type", "next"].includes(
-            key
-          )
-        ) {
-          params.set(key, value);
-        }
-      });
-
-      result.redirectUrl = "/reset-password?" + params.toString();
-    } else if (redirectTo) {
-      // Redirigir exactamente a la URL solicitada, agregando code si aplica
-      let targetUrl = redirectTo;
-      if (code && type !== "recovery") {
-        const separator = targetUrl.includes("?") ? "&" : "?";
-        targetUrl += `${separator}code=${encodeURIComponent(code)}`;
-        if (system) targetUrl += `&system=${encodeURIComponent(system)}`;
+    // Preserve other parameters (system, redirect_to, etc.)
+    url.searchParams.forEach((value, key) => {
+      if (
+        !["code", "access_token", "refresh_token", "type", "next"].includes(key)
+      ) {
+        params.set(key, value);
       }
-      result.redirectUrl = targetUrl;
-    } else {
-      const brandConfig = resolveBrand(system);
-      let targetUrl = brandConfig?.redirectUrlAfterLogin || DEFAULT_REDIRECT_URL;
-      if (code && type !== "recovery") {
-        const separator = targetUrl.includes("?") ? "&" : "?";
-        targetUrl += `${separator}code=${encodeURIComponent(code)}`;
-        if (system) targetUrl += `&system=${encodeURIComponent(system)}`;
-      }
-      result.redirectUrl = targetUrl;
+    });
+
+    result.redirectUrl = "/reset-password?" + params.toString();
+  } else if (redirectTo) {
+    // Redirigir exactamente a la URL solicitada, agregando code si aplica
+    let targetUrl = redirectTo;
+    if (code && type !== "recovery") {
+      const separator = targetUrl.includes("?") ? "&" : "?";
+      targetUrl += `${separator}code=${encodeURIComponent(code)}`;
+      if (system) targetUrl += `&system=${encodeURIComponent(system)}`;
     }
-
-    console.log("--- Callback Redirect Debug ---");
-    console.log("Current URL:", url.toString());
-    console.log("Type:", type);
-    console.log("Redirect To Param:", redirectTo);
-    console.log("System Param:", system);
-    console.log("Connected:", result.connected);
-    console.log("Final Redirect URL:", result.redirectUrl);
-    console.log("-------------------------------");
-  } catch (err: any) {
-    console.error("Excepción en callback:", err);
-    result.message = "Ocurrió un error inesperado al procesar la solicitud.";
+    result.redirectUrl = targetUrl;
+  } else {
+    const brandConfig = resolveBrand(system);
+    let targetUrl = brandConfig?.redirectUrlAfterLogin || DEFAULT_REDIRECT_URL;
+    if (code && type !== "recovery") {
+      const separator = targetUrl.includes("?") ? "&" : "?";
+      targetUrl += `${separator}code=${encodeURIComponent(code)}`;
+      if (system) targetUrl += `&system=${encodeURIComponent(system)}`;
+    }
+    result.redirectUrl = targetUrl;
   }
+
+  console.log("--- Callback Redirect Debug ---");
+  console.log("Current URL:", url.toString());
+  console.log("Type:", type);
+  console.log("Redirect To Param:", redirectTo);
+  console.log("System Param:", system);
+  console.log("Connected:", result.connected);
+  console.log("Final Redirect URL:", result.redirectUrl);
+  console.log("-------------------------------");
 
   // Verificar que siempre hay un redirectUrl válido
   if (result.connected && !result.redirectUrl) {
