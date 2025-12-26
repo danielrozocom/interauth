@@ -11,9 +11,21 @@ export const load: PageServerLoad = async ({
   const accessToken = url.searchParams.get("access_token");
   const refreshToken = url.searchParams.get("refresh_token");
   const next = url.searchParams.get("next");
-  const system = url.searchParams.get("system");
-  const redirectTo = url.searchParams.get("redirectTo");
   const type = url.searchParams.get("type"); // recovery, signup, etc.
+
+  // Get state and parse it
+  const stateParam = url.searchParams.get("state");
+  let stateData: { redirectTo?: string; system?: string } = {};
+  if (stateParam) {
+    try {
+      stateData = JSON.parse(stateParam);
+    } catch (e) {
+      console.warn("Invalid state param:", stateParam);
+    }
+  }
+
+  const redirectTo = stateData.redirectTo || url.searchParams.get("redirectTo");
+  const system = stateData.system || url.searchParams.get("system");
 
   // Check if session already exists and redirect immediately
   const {

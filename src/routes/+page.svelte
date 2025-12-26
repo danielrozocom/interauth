@@ -41,13 +41,6 @@
       window.history.replaceState(window.history.state, "", newUrl);
     }
 
-    // Remove redirectTo from URL to avoid leaking
-    if (params.get("redirectTo")) {
-      params.delete("redirectTo");
-      const newUrl = `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}${window.location.hash}`;
-      window.history.replaceState(window.history.state, "", newUrl);
-    }
-
     // Prefer the stored email if present (preserves between views)
     const stored = get(recoveryEmail);
     if (stored) {
@@ -348,21 +341,19 @@
       urlParams.delete("email");
       const finalRedirectTo = data.redirectTo;
 
-      let callbackUrl = window.location.origin;
-      if (data?.system) {
-        callbackUrl += `/?system=${data.system}`;
-      } else {
-        callbackUrl += "/";
-      }
-
-      if (finalRedirectTo) {
-        const separator = callbackUrl.includes("?") ? "&" : "?";
-        callbackUrl += `${separator}redirectTo=${encodeURIComponent(finalRedirectTo)}`;
-      }
+      // Create state with redirectTo and system
+      const stateData = {
+        redirectTo: finalRedirectTo,
+        system: data.system,
+      };
+      const state = JSON.stringify(stateData);
 
       const { data: res } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: callbackUrl },
+        options: {
+          redirectTo: `${window.location.origin}/callback`,
+          state,
+        },
       });
       if (res?.url) {
         // If the provider URL points to the production auth host, but we are running
