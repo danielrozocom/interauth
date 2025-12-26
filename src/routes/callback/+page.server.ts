@@ -1,6 +1,6 @@
 import type { PageServerLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
-import { DEFAULT_REDIRECT_URL, resolveBrand } from "$lib/brandConfig";
+import { DEFAULT_REDIRECT_URL, resolveBrand, isRedirectUrlAllowed } from "$lib/brandConfig";
 
 export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
   const code = url.searchParams.get("code");
@@ -12,6 +12,13 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
   // Support both camelCase and snake_case for redirect URL
   const redirectTo =
     url.searchParams.get("redirectTo") || url.searchParams.get("redirect_to");
+
+  // Validar redirectTo si está presente
+  if (redirectTo && !isRedirectUrlAllowed(system, redirectTo)) {
+    result.message = "URL de redirección no permitida.";
+    result.connected = false;
+    return result;
+  }
 
   // Check if session already exists and redirect immediately
   const {
@@ -55,46 +62,9 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
       result.message = "No se recibió ningún código de autenticación.";
       return result;
     }
+    // Para SSO multi-dominio, no hacer exchange aquí; pasar el code al cliente
+    result.connected = true;
   }
-
-  try {
-    // For non-recovery flows we still need to exchange the code and
-    // establish a session (OAuth / sign-in). For recovery we purposely
-    // skip session establishment to keep this flow focused on password
-    // reset rather than login.
-    let error = null;
-    if (type !== "recovery") {
-      const { error: exchangeError } =
-        await supabase.auth.exchangeCodeForSession(code!);
-      error = exchangeError;
-      if (error) {
-        console.warn("Error al establecer sesión:", error.message);
-        // Redirigir a /error con detalles del fallo OAuth
-        const errorParams = new URLSearchParams();
-        errorParams.set("error", "oauth_failed");
-        errorParams.set(
-          "description",
-          error.message || "OAuth exchange failed"
-        );
-        if (system) errorParams.set("system", system);
-        result.redirectUrl = "/error?" + errorParams.toString();
-        result.connected = false;
-        result.message =
-          error.message || "El enlace no es válido o ha expirado.";
-        return result;
-      }
-
-      // Verify session
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        result.message =
-          "No se pudo establecer la sesión. Intenta iniciar sesión manualmente.";
-        return result;
-      }
-    }
 
     // 4. Éxito: Preparar URL de destino
     result.connected = true;
@@ -121,15 +91,23 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 
       result.redirectUrl = "/reset-password?" + params.toString();
     } else if (redirectTo) {
-      // Redirigir exactamente a la URL solicitada
-      result.redirectUrl = redirectTo;
+      // Redirigir exactamente a la URL solicitada, agregando code si aplica
+      let targetUrl = redirectTo;
+      if (code && type !== "recovery") {
+        const separator = targetUrl.includes("?") ? "&" : "?";
+        targetUrl += `${separator}code=${encodeURIComponent(code)}`;
+        if (system) targetUrl += `&system=${encodeURIComponent(system)}`;
+      }
+      result.redirectUrl = targetUrl;
     } else {
       const brandConfig = resolveBrand(system);
-      if (brandConfig && brandConfig.redirectUrlAfterLogin) {
-        result.redirectUrl = brandConfig.redirectUrlAfterLogin;
-      } else {
-        result.redirectUrl = DEFAULT_REDIRECT_URL;
+      let targetUrl = brandConfig?.redirectUrlAfterLogin || DEFAULT_REDIRECT_URL;
+      if (code && type !== "recovery") {
+        const separator = targetUrl.includes("?") ? "&" : "?";
+        targetUrl += `${separator}code=${encodeURIComponent(code)}`;
+        if (system) targetUrl += `&system=${encodeURIComponent(system)}`;
       }
+      result.redirectUrl = targetUrl;
     }
 
     console.log("--- Callback Redirect Debug ---");

@@ -4,6 +4,7 @@ import {
   hasSupabaseReservedParam,
   isSystemValid,
   DEFAULT_REDIRECT_URL,
+  isRedirectUrlAllowed,
 } from "$lib/brandConfig";
 import type { PageServerLoad } from "./$types";
 
@@ -25,6 +26,14 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 
   const redirectTo = url.searchParams.get("redirectTo");
   const { session: currentSession } = await locals.safeGetSession();
+
+  // Validar redirectTo si está presente
+  if (redirectTo && !isRedirectUrlAllowed(system, redirectTo)) {
+    return {
+      error: "URL de redirección no permitida.",
+      system,
+    };
+  }
 
   if (currentSession && redirectTo) {
     throw redirect(303, redirectTo);

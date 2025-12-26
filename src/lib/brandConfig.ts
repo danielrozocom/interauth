@@ -17,6 +17,8 @@ export interface BrandConfig {
   primaryColor: string;
   /** URL a donde redirigir después del login exitoso */
   redirectUrlAfterLogin: string;
+  /** Lista de URLs permitidas para redirectTo, soporta wildcards como *.domain.com */
+  allowedRedirectUrls: string[];
   /** URL opcional del logo (favicon/logo que se muestra en la tarjeta) */
   logoUrl?: string;
   /** Subtítulo opcional que aparece debajo del nombre en la pantalla de login */
@@ -41,6 +43,7 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     // Use a relative redirect in local config; the server/client will
     // resolve this against the current origin so we don't hardcode ports.
     redirectUrlAfterLogin: "/",
+    allowedRedirectUrls: ["http://localhost:*", "https://localhost:*"],
     subtitle: "Login",
   },
   // The auth UI itself (used when ?system=auth or no system provided)
@@ -48,6 +51,7 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     name: "InterAuth",
     primaryColor: "#35528C",
     redirectUrlAfterLogin: "/",
+    allowedRedirectUrls: ["https://auth.interfundeoms.edu.co"],
     subtitle: "Authentication",
   },
   // InterPOS
@@ -55,6 +59,7 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     name: "InterPOS",
     primaryColor: "#35528C",
     redirectUrlAfterLogin: "https://pos.interfundeoms.edu.co/",
+    allowedRedirectUrls: ["https://pos.interfundeoms.edu.co", "https://pos.otrodominio.com"],
     subtitle: "Login",
   },
 
@@ -63,6 +68,7 @@ const BRAND_CONFIG: Record<string, BrandConfig> = {
     name: "InterAPP",
     primaryColor: "#35528C",
     redirectUrlAfterLogin: "https://app.interfundeoms.edu.co",
+    allowedRedirectUrls: ["https://*.trycloudflare.com", "https://app.interfundeoms.edu.co"],
     subtitle: "Login",
   },
 };
@@ -142,6 +148,55 @@ export function resolveBrand(
     ...config,
     primaryColor: config.primaryColor || DEFAULT_PRIMARY_COLOR,
   };
+}
+
+/**
+ * Convierte un patrón con wildcard a una expresión regular
+ * Ej: "*.domain.com" -> /^https?:\/\/.*\.domain\.com(\/.*)?$/
+ */
+function patternToRegex(pattern: string): RegExp {
+  // Escapar caracteres especiales
+  let regex = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Reemplazar \* con .*
+  regex = regex.replace(/\\\*/g, '.*');
+  // Para localhost:*, reemplazar :* con :\d+
+  regex = regex.replace(/:\\\*/, ':\\d+');
+  // Agregar ^ y $ para match completo
+  regex = `^${regex}(\\/.*)?$`;
+  return new RegExp(regex, 'i'); // case insensitive
+}
+
+/**
+ * Valida si una URL está permitida para un sistema dado
+ * @param system - El sistema
+ * @param url - La URL a validar
+ * @returns true si está permitida
+ */
+export function isRedirectUrlAllowed(system: string | null | undefined, url: string): boolean {
+  const config = resolveBrand(system);
+  if (!config) return false;
+
+  try {
+    const parsedUrl = new URL(url);
+    const isDev = process.env.NODE_ENV === "development";
+
+    // Rechazar HTTP a menos que sea dev
+    if (parsedUrl.protocol !== 'https:' && !isDev) {
+      return false;
+    }
+
+    // Verificar contra allowedRedirectUrls
+    for (const pattern of config.allowedRedirectUrls) {
+      const regex = patternToRegex(pattern);
+      if (regex.test(url)) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    // URL inválida
+    return false;
+  }
 }
 
 /**
