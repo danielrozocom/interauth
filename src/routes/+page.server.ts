@@ -27,32 +27,21 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
   const redirectTo = url.searchParams.get("redirectTo");
   const { session: currentSession } = await locals.safeGetSession();
 
-  // Si hay redirectTo, guardarlo y redirigir a URL limpia
+  let validatedRedirectTo: string | null = null;
+  let redirectError: string | null = null;
+
+  // Si hay redirectTo, validarlo
   if (redirectTo) {
-    // Validar que sea URL absoluta http/https
     try {
       const parsed = new URL(redirectTo);
       if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        return {
-          error: "URL de redirección debe ser http o https.",
-          system,
-        };
+        redirectError = "URL de redirección debe ser http o https.";
+      } else {
+        validatedRedirectTo = redirectTo;
       }
     } catch {
-      return {
-        error: "URL de redirección inválida.",
-        system,
-      };
+      redirectError = "URL de redirección inválida.";
     }
-    // Guardar en cookie por 5 minutos
-    cookies.set("pending_redirect", redirectTo, {
-      path: "/",
-      httpOnly: true,
-      secure: !isDev,
-      maxAge: 300,
-    });
-    // Redirigir a URL limpia
-    throw redirect(303, `/?system=${system || ""}`);
   }
 
   // 2. Si NO hay código, verificar si ya hay sesión activa
@@ -60,13 +49,7 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
   const { session } = await locals.safeGetSession();
   const type = url.searchParams.get("type");
   if (session && !code && type !== "recovery") {
-    const pendingRedirect = cookies.get("pending_redirect");
-    if (pendingRedirect) {
-      cookies.delete("pending_redirect");
-      throw redirect(303, pendingRedirect);
-    }
-
-    // Si ya tiene sesión, y visita root, quizás queramos mandarlo al sistema por defecto o al que pida
+    // Si ya tiene sesión, redirigir según system o default
     if (system) {
       const brandConfig = resolveBrand(system);
       if (brandConfig?.redirectUrlAfterLogin) {
@@ -87,6 +70,7 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
         throw redirect(303, final);
       }
     }
+    throw redirect(303, DEFAULT_REDIRECT_URL);
   }
 
   // Decide si este acceso es válido en base a `system` y a la presencia de parámetros de Supabase
@@ -103,6 +87,9 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
       invalidAccess: true,
       system: system || null,
       brandConfig: null,
+      redirectTo: validatedRedirectTo,
+      error: redirectError,
+      defaultRedirect: DEFAULT_REDIRECT_URL,
     };
   }
 
@@ -110,6 +97,8 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
     invalidAccess: false,
     system: system || null,
     brandConfig: brandCfg,
+    redirectTo: validatedRedirectTo,
+    error: redirectError,
     defaultRedirect: DEFAULT_REDIRECT_URL,
   };
 };

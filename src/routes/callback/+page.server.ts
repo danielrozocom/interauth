@@ -12,18 +12,16 @@ export const load: PageServerLoad = async ({
   const refreshToken = url.searchParams.get("refresh_token");
   const next = url.searchParams.get("next");
   const system = url.searchParams.get("system");
+  const redirectTo = url.searchParams.get("redirectTo");
   const type = url.searchParams.get("type"); // recovery, signup, etc.
-  // No usar redirectTo param, usar cookie
 
   // Check if session already exists and redirect immediately
   const {
     data: { session: existingSession },
   } = await supabase.auth.getSession();
   if (existingSession) {
-    const pendingRedirect = cookies.get("pending_redirect");
-    if (pendingRedirect) {
-      cookies.delete("pending_redirect");
-      throw redirect(302, pendingRedirect);
+    if (redirectTo) {
+      throw redirect(302, redirectTo);
     } else if (system) {
       const brandConfig = resolveBrand(system);
       throw redirect(
@@ -86,15 +84,13 @@ export const load: PageServerLoad = async ({
 
     result.redirectUrl = "/reset-password?" + params.toString();
   } else {
-    const pendingRedirect = cookies.get("pending_redirect");
-    if (pendingRedirect) {
-      // Redirigir al redirectTo guardado, agregando code
-      let targetUrl = pendingRedirect;
+    if (redirectTo) {
+      // Redirigir al redirectTo, agregando code
+      let targetUrl = redirectTo;
       if (code && type !== "recovery") {
         const separator = targetUrl.includes("?") ? "&" : "?";
         targetUrl += `${separator}code=${encodeURIComponent(code)}`;
       }
-      cookies.delete("pending_redirect");
       result.redirectUrl = targetUrl;
     } else {
       const brandConfig = resolveBrand(system);
@@ -103,7 +99,6 @@ export const load: PageServerLoad = async ({
       if (code && type !== "recovery") {
         const separator = targetUrl.includes("?") ? "&" : "?";
         targetUrl += `${separator}code=${encodeURIComponent(code)}`;
-        if (system) targetUrl += `&system=${encodeURIComponent(system)}`;
       }
       result.redirectUrl = targetUrl;
     }
@@ -112,7 +107,7 @@ export const load: PageServerLoad = async ({
   console.log("--- Callback Redirect Debug ---");
   console.log("Current URL:", url.toString());
   console.log("Type:", type);
-  console.log("Pending Redirect Cookie:", cookies.get("pending_redirect"));
+  console.log("Redirect To Param:", redirectTo);
   console.log("System Param:", system);
   console.log("Connected:", result.connected);
   console.log("Final Redirect URL:", result.redirectUrl);

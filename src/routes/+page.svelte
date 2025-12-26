@@ -41,6 +41,13 @@
       window.history.replaceState(window.history.state, "", newUrl);
     }
 
+    // Remove redirectTo from URL to avoid leaking
+    if (params.get("redirectTo")) {
+      params.delete("redirectTo");
+      const newUrl = `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}${window.location.hash}`;
+      window.history.replaceState(window.history.state, "", newUrl);
+    }
+
     // Prefer the stored email if present (preserves between views)
     const stored = get(recoveryEmail);
     if (stored) {
@@ -307,8 +314,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       // Prevent leaking email through redirect params
       urlParams.delete("email");
-      const redirectTo =
-        urlParams.get("redirectTo") || urlParams.get("redirect_to");
+      const redirectTo = data.redirectTo;
 
       let target = "/";
       if (redirectTo) {
@@ -340,8 +346,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       // Ensure we don't propagate email in query params
       urlParams.delete("email");
-      const finalRedirectTo =
-        urlParams.get("redirectTo") || urlParams.get("redirect_to");
+      const finalRedirectTo = data.redirectTo;
 
       let callbackUrl = window.location.origin;
       if (data?.system) {
