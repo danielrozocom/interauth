@@ -5,11 +5,7 @@ import {
   validateAndNormalizeRedirectTo,
 } from "$lib/brandConfig";
 
-export const load: PageServerLoad = async ({
-  url,
-  locals: { supabase },
-  cookies,
-}) => {
+export const load: PageServerLoad = async ({ url }) => {
   const code = url.searchParams.get("code");
   const accessToken = url.searchParams.get("access_token");
   const refreshToken = url.searchParams.get("refresh_token");

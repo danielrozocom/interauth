@@ -1,3 +1,4 @@
+// Removed session management logic
 import { createSupabaseServerClient } from "$lib/supabase/serverClient";
 import { type Handle, redirect } from "@sveltejs/kit";
 
