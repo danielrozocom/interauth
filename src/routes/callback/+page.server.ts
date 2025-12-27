@@ -35,6 +35,22 @@ export const load: PageServerLoad = async ({
     ? validateAndNormalizeRedirectTo(redirectTo)
     : null;
 
+  // If we received an authorization `code` (PKCE SSO), do NOT perform any
+  // server-side exchange or session creation. Immediately redirect the user
+  // to the target including the `code` so the upstream system can finish
+  // the PKCE flow. This keeps the auth service stateless and avoids setting
+  // any sb-* cookies on this host.
+  if (code && type !== "recovery") {
+    const brandConfig = resolveBrand(system);
+    let targetUrl =
+      normalizedRedirectTo ||
+      brandConfig?.redirectUrlAfterLogin ||
+      DEFAULT_REDIRECT_URL;
+    const separator = targetUrl.includes("?") ? "&" : "?";
+    targetUrl += `${separator}code=${encodeURIComponent(code)}`;
+    throw redirect(302, targetUrl);
+  }
+
   // Check if session already exists and redirect immediately
   const {
     data: { session: existingSession },
